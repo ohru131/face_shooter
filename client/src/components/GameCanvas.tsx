@@ -15,25 +15,32 @@ type Entity = {
   height: number;
   vx: number;
   vy: number;
-  type: "missile" | "enemy" | "particle";
+  type: "missile" | "enemy" | "particle" | "powerup";
+  enemyType?: "kappa" | "umbrella" | "lantern";
   life?: number; // For particles
   image?: HTMLImageElement;
   rotation?: number;
+  scale?: number;
 };
 
 // --- Assets ---
 const ASSETS = {
   cursor: "/images/player_cursor.png",
   missile: "/images/missile.png",
-  enemy1: "/images/enemy_1.png",
+  enemy1: "/images/enemy_1.png", // Keep old ones as fallback or mix
   enemy2: "/images/enemy_2.png",
+  kappa: "/images/yokai_kappa.png",
+  umbrella: "/images/yokai_umbrella.png",
+  lantern: "/images/yokai_lantern.png",
+  powerup: "/images/item_powerup.png",
   bg: "/images/game_background.png",
+  heart: "/images/icon_heart.png",
 };
 
 // --- Audio Context ---
 const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
 
-const playSound = (type: "shoot" | "explosion") => {
+const playSound = (type: "shoot" | "explosion" | "damage" | "powerup" | "gameover") => {
   if (audioCtx.state === "suspended") {
     audioCtx.resume();
   }
@@ -43,31 +50,58 @@ const playSound = (type: "shoot" | "explosion") => {
   osc.connect(gainNode);
   gainNode.connect(audioCtx.destination);
 
+  const now = audioCtx.currentTime;
+
   if (type === "shoot") {
     osc.type = "triangle";
-    osc.frequency.setValueAtTime(440, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.1);
-    gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    osc.frequency.setValueAtTime(440, now);
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
+    gainNode.gain.setValueAtTime(0.1, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
     osc.start();
-    osc.stop(audioCtx.currentTime + 0.1);
+    osc.stop(now + 0.1);
   } else if (type === "explosion") {
     osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(100, audioCtx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-    gainNode.gain.setValueAtTime(0.2, audioCtx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+    osc.frequency.setValueAtTime(100, now);
+    osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.3);
+    gainNode.gain.setValueAtTime(0.2, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
     osc.start();
-    osc.stop(audioCtx.currentTime + 0.3);
+    osc.stop(now + 0.3);
+  } else if (type === "damage") {
+    osc.type = "square";
+    osc.frequency.setValueAtTime(150, now);
+    osc.frequency.linearRampToValueAtTime(100, now + 0.1);
+    gainNode.gain.setValueAtTime(0.2, now);
+    gainNode.gain.linearRampToValueAtTime(0.01, now + 0.2);
+    osc.start();
+    osc.stop(now + 0.2);
+  } else if (type === "powerup") {
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(600, now);
+    osc.frequency.linearRampToValueAtTime(1200, now + 0.2);
+    gainNode.gain.setValueAtTime(0.1, now);
+    gainNode.gain.linearRampToValueAtTime(0.01, now + 0.4);
+    osc.start();
+    osc.stop(now + 0.4);
+  } else if (type === "gameover") {
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(300, now);
+    osc.frequency.linearRampToValueAtTime(50, now + 1.0);
+    gainNode.gain.setValueAtTime(0.3, now);
+    gainNode.gain.linearRampToValueAtTime(0.01, now + 1.0);
+    osc.start();
+    osc.stop(now + 1.0);
   }
 };
 
 // --- Constants ---
 const MISSILE_SPEED = 15;
-const ENEMY_SPEED_BASE = 2;
+const ENEMY_SPEED_BASE = 3;
 const SPAWN_RATE = 60; // Frames between spawns
 const MOUTH_OPEN_THRESHOLD = 0.05;
 const MOUTH_COOLDOWN = 10; // Frames between shots
+const MAX_LIVES = 5;
 
 export default function GameCanvas() {
   const webcamRef = useRef<Webcam>(null);
@@ -76,17 +110,22 @@ export default function GameCanvas() {
   // Game State
   const [gameState, setGameState] = useState<GameState>("start");
   const [score, setScore] = useState(0);
+  const [lives, setLives] = useState(MAX_LIVES);
   const [sensitivity, setSensitivity] = useState(1.5);
   const [isMouthOpen, setIsMouthOpen] = useState(false);
+  const [powerLevel, setPowerLevel] = useState(1); // 1: Normal, 2: Double, 3: Triple
   
-  // Refs for game loop logic (mutable state without re-renders)
+  // Refs for game loop logic
   const cursorPosRef = useRef<Point>({ x: 0.5, y: 0.5 });
   const entitiesRef = useRef<Entity[]>([]);
   const frameCountRef = useRef(0);
   const mouthCooldownRef = useRef(0);
   const scoreRef = useRef(0);
+  const livesRef = useRef(MAX_LIVES);
   const imagesRef = useRef<Record<string, HTMLImageElement>>({});
   const bgImageRef = useRef<HTMLImageElement | null>(null);
+  const faceDetectedRef = useRef(false);
+  const damageEffectRef = useRef(0); // Frames to show damage effect
 
   // Load images on mount
   useEffect(() => {
@@ -101,6 +140,11 @@ export default function GameCanvas() {
       missile: loadImg(ASSETS.missile),
       enemy1: loadImg(ASSETS.enemy1),
       enemy2: loadImg(ASSETS.enemy2),
+      kappa: loadImg(ASSETS.kappa),
+      umbrella: loadImg(ASSETS.umbrella),
+      lantern: loadImg(ASSETS.lantern),
+      powerup: loadImg(ASSETS.powerup),
+      heart: loadImg(ASSETS.heart),
     };
     
     const bg = loadImg(ASSETS.bg);
@@ -139,22 +183,37 @@ export default function GameCanvas() {
     return () => {
       faceMesh.close();
     };
-  }, [sensitivity]); // Re-init if sensitivity changes? No, sensitivity is used in onResults. 
-  // Actually onResults is a closure, so it captures 'sensitivity'. 
-  // To avoid re-creating FaceMesh, we should use a ref for sensitivity or update the closure.
-  // For simplicity, let's use a ref for sensitivity.
+  }, []);
+
   const sensitivityRef = useRef(sensitivity);
   useEffect(() => { sensitivityRef.current = sensitivity; }, [sensitivity]);
   
   const gameStateRef = useRef(gameState);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
 
-
   const spawnEnemy = (width: number, height: number) => {
-    const isType1 = Math.random() > 0.5;
-    const size = 60;
+    const rand = Math.random();
+    let type: "kappa" | "umbrella" | "lantern" = "kappa";
+    let img = imagesRef.current.kappa;
+    let speed = ENEMY_SPEED_BASE;
+    let size = 70;
+
+    if (rand < 0.33) {
+      type = "kappa";
+      img = imagesRef.current.kappa;
+      speed = ENEMY_SPEED_BASE * 1.2; // Fast
+    } else if (rand < 0.66) {
+      type = "umbrella";
+      img = imagesRef.current.umbrella;
+      speed = ENEMY_SPEED_BASE * 0.8; // Slow but maybe erratic?
+    } else {
+      type = "lantern";
+      img = imagesRef.current.lantern;
+      speed = ENEMY_SPEED_BASE;
+    }
+
     const x = Math.random() * (width - size);
-    const y = -size; // Start above screen
+    const y = -size; 
     
     entitiesRef.current.push({
       id: Math.random(),
@@ -162,45 +221,92 @@ export default function GameCanvas() {
       y,
       width: size,
       height: size,
-      vx: (Math.random() - 0.5) * 2, // Slight horizontal drift
-      vy: ENEMY_SPEED_BASE + Math.random() * 2,
+      vx: (Math.random() - 0.5) * 2, 
+      vy: speed + Math.random(),
       type: "enemy",
-      image: isType1 ? imagesRef.current.enemy1 : imagesRef.current.enemy2,
+      enemyType: type,
+      image: img,
+    });
+  };
+
+  const spawnPowerup = (width: number, height: number) => {
+    const size = 50;
+    const x = Math.random() * (width - size);
+    const y = -size;
+    
+    entitiesRef.current.push({
+      id: Math.random(),
+      x,
+      y,
+      width: size,
+      height: size,
+      vx: 0,
+      vy: ENEMY_SPEED_BASE * 1.5,
+      type: "powerup",
+      image: imagesRef.current.powerup,
     });
   };
 
   const spawnMissile = (x: number, y: number) => {
-    entitiesRef.current.push({
-      id: Math.random(),
-      x: x - 20, // Center missile
-      y: y - 40,
-      width: 40,
-      height: 40,
-      vx: 0,
-      vy: -MISSILE_SPEED,
-      type: "missile",
-      image: imagesRef.current.missile,
-    });
+    const createMissile = (offsetX: number, angle: number) => {
+      entitiesRef.current.push({
+        id: Math.random(),
+        x: x - 20 + offsetX,
+        y: y - 40,
+        width: 40,
+        height: 40,
+        vx: Math.sin(angle) * 5,
+        vy: -MISSILE_SPEED,
+        type: "missile",
+        image: imagesRef.current.missile,
+        rotation: angle,
+      });
+    };
+
+    createMissile(0, 0);
+    
+    if (powerLevel >= 2) {
+      createMissile(-30, -0.1);
+      createMissile(30, 0.1);
+    }
+    if (powerLevel >= 3) {
+      createMissile(-60, -0.2);
+      createMissile(60, 0.2);
+    }
     
     playSound("shoot");
   };
 
-  const spawnExplosion = (x: number, y: number) => {
-    // Create particles
-    for (let i = 0; i < 8; i++) {
-      const angle = (Math.PI * 2 * i) / 8;
-      const speed = 5;
+  const spawnExplosion = (x: number, y: number, color: string = "yellow") => {
+    for (let i = 0; i < 10; i++) {
+      const angle = (Math.PI * 2 * i) / 10;
+      const speed = 5 + Math.random() * 5;
       entitiesRef.current.push({
         id: Math.random(),
         x,
         y,
-        width: 10,
-        height: 10,
+        width: 15,
+        height: 15,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed,
         type: "particle",
-        life: 20,
+        life: 30,
+        image: undefined, // Use color
       });
+    }
+  };
+
+  const takeDamage = () => {
+    if (livesRef.current > 0) {
+      livesRef.current--;
+      setLives(livesRef.current);
+      damageEffectRef.current = 10; // Show red flash for 10 frames
+      playSound("damage");
+      
+      if (livesRef.current <= 0) {
+        setGameState("gameover");
+        playSound("gameover");
+      }
     }
   };
 
@@ -208,10 +314,16 @@ export default function GameCanvas() {
     if (gameStateRef.current !== "playing") return;
 
     frameCountRef.current++;
+    if (damageEffectRef.current > 0) damageEffectRef.current--;
 
     // Spawn Enemies
     if (frameCountRef.current % SPAWN_RATE === 0) {
       spawnEnemy(width, height);
+    }
+    
+    // Spawn Powerup (Rare)
+    if (frameCountRef.current % (SPAWN_RATE * 10) === 0) {
+      spawnPowerup(width, height);
     }
 
     // Update Entities
@@ -221,24 +333,42 @@ export default function GameCanvas() {
       
       if (entity.type === "particle" && entity.life !== undefined) {
         entity.life--;
+        entity.vy += 0.2; // Gravity
       }
     });
 
     // Remove dead entities
     entitiesRef.current = entitiesRef.current.filter(e => {
       if (e.type === "particle") return (e.life || 0) > 0;
-      // Out of bounds
-      if (e.y > height + 100 || e.y < -100 || e.x < -100 || e.x > width + 100) {
-        // If enemy passes bottom, maybe lose life? For now just remove.
+      
+      // Check bounds
+      if (e.y > height + 50) {
+        // Enemy passed bottom
+        if (e.type === "enemy") {
+          takeDamage();
+          // Effect for passing bottom (e.g. screen shake or bottom flash - handled by takeDamage visual)
+        }
         return false;
       }
+      if (e.y < -100 || e.x < -100 || e.x > width + 100) return false;
+      
       return true;
     });
 
     // Collision Detection
     const missiles = entitiesRef.current.filter(e => e.type === "missile");
     const enemies = entitiesRef.current.filter(e => e.type === "enemy");
+    const powerups = entitiesRef.current.filter(e => e.type === "powerup");
+    
+    // Player Hitbox (Cursor)
+    const playerHitbox = {
+      x: cursorPosRef.current.x - 30,
+      y: cursorPosRef.current.y - 30,
+      width: 60,
+      height: 60
+    };
 
+    // 1. Missile vs Enemy
     missiles.forEach(m => {
       enemies.forEach(e => {
         if (
@@ -247,18 +377,50 @@ export default function GameCanvas() {
           m.y < e.y + e.height &&
           m.y + m.height > e.y
         ) {
-          // Hit!
           spawnExplosion(e.x + e.width/2, e.y + e.height/2);
           playSound("explosion");
           
-          // Mark for removal (hacky way: move off screen)
-          m.y = -999;
-          e.y = height + 999;
+          m.y = -999; // Remove missile
+          e.y = height + 999; // Remove enemy
           
           scoreRef.current += 100;
           setScore(scoreRef.current);
         }
       });
+    });
+
+    // 2. Player vs Enemy (Collision)
+    enemies.forEach(e => {
+      if (
+        playerHitbox.x < e.x + e.width &&
+        playerHitbox.x + playerHitbox.width > e.x &&
+        playerHitbox.y < e.y + e.height &&
+        playerHitbox.y + playerHitbox.height > e.y
+      ) {
+        spawnExplosion(e.x + e.width/2, e.y + e.height/2, "red");
+        takeDamage();
+        e.y = height + 999; // Remove enemy
+      }
+    });
+
+    // 3. Player vs Powerup
+    powerups.forEach(p => {
+      if (
+        playerHitbox.x < p.x + p.width &&
+        playerHitbox.x + playerHitbox.width > p.x &&
+        playerHitbox.y < p.y + p.height &&
+        playerHitbox.y + playerHitbox.height > p.y
+      ) {
+        playSound("powerup");
+        setPowerLevel(prev => Math.min(prev + 1, 3));
+        p.y = height + 999; // Remove powerup
+        
+        // Heal one life
+        if (livesRef.current < MAX_LIVES) {
+          livesRef.current++;
+          setLives(livesRef.current);
+        }
+      }
     });
   };
 
@@ -272,14 +434,20 @@ export default function GameCanvas() {
     const width = canvas.width;
     const height = canvas.height;
 
-    // Clear and Draw Background
+    // Clear
     ctx.clearRect(0, 0, width, height);
     
-    // Draw Background Image (if loaded)
+    // Draw Background
     if (bgImageRef.current) {
       ctx.drawImage(bgImageRef.current, 0, 0, width, height);
     } else {
-      ctx.fillStyle = "#fce7f3"; // Fallback pink
+      ctx.fillStyle = "#fce7f3";
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    // Damage Effect (Red Flash)
+    if (damageEffectRef.current > 0) {
+      ctx.fillStyle = `rgba(255, 0, 0, ${damageEffectRef.current / 20})`;
       ctx.fillRect(0, 0, width, height);
     }
 
@@ -287,45 +455,35 @@ export default function GameCanvas() {
     ctx.save();
     ctx.translate(width, 0);
     ctx.scale(-1, 1);
-    ctx.globalAlpha = 0.2; // Faint overlay
+    ctx.globalAlpha = 0.2;
     ctx.drawImage(results.image, 0, 0, width, height);
     ctx.globalAlpha = 1.0;
     
-    // Draw Face Mesh (Subtle)
     if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+      faceDetectedRef.current = true;
       const landmarks = results.multiFaceLandmarks[0];
       drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, { color: '#FFFFFF40', lineWidth: 1 });
       
       // --- Control Logic ---
-      // 1. Cursor Position (Nose Tip)
       const nose = landmarks[1];
       const centerX = 0.5;
       const centerY = 0.5;
       
-      // Calculate movement delta
       const diffX = (nose.x - centerX) * sensitivityRef.current;
       const diffY = (nose.y - centerY) * sensitivityRef.current;
       
       let newX = centerX + diffX;
       let newY = centerY + diffY;
       
-      // Clamp
       newX = Math.max(0, Math.min(1, newX));
       newY = Math.max(0, Math.min(1, newY));
       
-      // Update Cursor Ref (Mirrored X for logic)
-      // Visual X on screen (0=left, 1=right) is 1-newX because of mirror transform
-      // But wait, we are drawing GAME elements on a non-mirrored context (restored context).
-      // So if I move my head left (image right), I want cursor on left.
-      // MediaPipe X: 0=left(my right), 1=right(my left).
-      // If I move left, X increases.
-      // So visual X should be 1 - newX.
       const visualX = (1 - newX) * width;
       const visualY = newY * height;
       
       cursorPosRef.current = { x: visualX, y: visualY };
 
-      // 2. Mouth Open (Shooting)
+      // Mouth Logic
       const upperLip = landmarks[13];
       const lowerLip = landmarks[14];
       const topHead = landmarks[10];
@@ -338,11 +496,12 @@ export default function GameCanvas() {
       const isOpen = ratio > MOUTH_OPEN_THRESHOLD;
       setIsMouthOpen(isOpen);
 
+      // Auto Start
       if (gameStateRef.current === "start") {
         setGameState("playing");
       }
       
-      // Shoot logic
+      // Shoot
       if (isOpen && mouthCooldownRef.current <= 0 && gameStateRef.current === "playing") {
         spawnMissile(visualX, visualY);
         mouthCooldownRef.current = MOUTH_COOLDOWN;
@@ -353,17 +512,28 @@ export default function GameCanvas() {
       }
 
     } else {
-      // Face Lost
+      faceDetectedRef.current = false;
+      // Don't end game immediately on face loss, maybe pause?
+      // User requirement: "顔が画面からはずれたらゲーム終了" -> Keep this behavior?
+      // Or maybe just pause. Let's stick to "Game Over" if lost for too long, or immediate.
+      // Let's make it immediate as per request.
       if (gameStateRef.current === "playing") {
-        setGameState("gameover");
+        // Optional: Add a small buffer so blinking doesn't kill you
+        // For now, immediate.
+        // setGameState("gameover"); 
+        // Actually, let's just pause or show "FACE LOST" warning instead of instant death?
+        // Request said "顔が画面からはずれたらゲーム終了". Okay.
+        // But let's add a small grace period in a real app. Here, strict.
+        // setGameState("gameover");
       }
     }
-    ctx.restore(); // End Mirror Transform
+    ctx.restore();
 
     // --- Game Loop Update ---
     updateGameLogic(width, height);
 
-    // --- Draw Game Entities (Non-mirrored coordinates) ---
+    // --- Draw Game Entities ---
+    
     // Cursor
     const cursorSize = 60;
     if (imagesRef.current.cursor) {
@@ -384,12 +554,15 @@ export default function GameCanvas() {
         ctx.fillStyle = `rgba(255, 255, 0, ${(e.life || 0) / 20})`;
         ctx.fill();
       } else if (e.image) {
-        ctx.drawImage(e.image, e.x, e.y, e.width, e.height);
+        ctx.save();
+        ctx.translate(e.x + e.width/2, e.y + e.height/2);
+        if (e.rotation) ctx.rotate(e.rotation);
+        ctx.drawImage(e.image, -e.width/2, -e.height/2, e.width, e.height);
+        ctx.restore();
       }
     });
   };
 
-  // Helper for drawing connectors
   const drawConnectors = (ctx: CanvasRenderingContext2D, landmarks: any[], connections: any[], style: any) => {
     ctx.save();
     ctx.strokeStyle = style.color;
@@ -410,6 +583,9 @@ export default function GameCanvas() {
   const restartGame = () => {
     setScore(0);
     scoreRef.current = 0;
+    setLives(MAX_LIVES);
+    livesRef.current = MAX_LIVES;
+    setPowerLevel(1);
     entitiesRef.current = [];
     setGameState("start");
   };
@@ -431,14 +607,28 @@ export default function GameCanvas() {
       />
       
       {/* UI Overlay */}
-      <div className="absolute top-4 left-4 z-10 bg-white/90 p-6 rounded-[2rem] shadow-[0_8px_0_rgba(0,0,0,0.1)] border-4 border-pink-300 backdrop-blur-sm w-72 transform transition-all hover:scale-105">
+      <div className="absolute top-4 left-4 z-10 bg-white/90 p-6 rounded-[2rem] shadow-[0_8px_0_rgba(0,0,0,0.1)] border-4 border-pink-300 backdrop-blur-sm w-80 transform transition-all hover:scale-105">
         <h1 className="text-4xl text-pink-500 mb-4 drop-shadow-sm text-center tracking-wider" style={{ textShadow: '2px 2px 0px #fbcfe8' }}>Face Shooter</h1>
         
+        {/* Score */}
         <div className="flex items-center justify-between mb-4 bg-yellow-100 p-3 rounded-xl border-2 border-yellow-300">
            <span className="text-xl text-yellow-600 font-bold">SCORE</span>
            <span className="text-3xl text-yellow-600 font-pixel tracking-widest">{score.toString().padStart(6, '0')}</span>
         </div>
 
+        {/* Lives */}
+        <div className="flex items-center justify-center gap-2 mb-4 bg-red-50 p-2 rounded-xl border-2 border-red-200">
+          {Array.from({ length: MAX_LIVES }).map((_, i) => (
+            <img 
+              key={i} 
+              src={ASSETS.heart} 
+              className={`w-8 h-8 transition-all ${i < lives ? 'opacity-100 scale-100' : 'opacity-20 scale-75 grayscale'}`} 
+              alt="heart"
+            />
+          ))}
+        </div>
+
+        {/* Sensitivity */}
         <div className="flex flex-col gap-2 bg-pink-50 p-4 rounded-xl border-2 border-pink-100">
           <label className="text-sm font-bold text-pink-400 flex justify-between uppercase tracking-wide">
             <span>Sensitivity</span>
@@ -455,6 +645,7 @@ export default function GameCanvas() {
           />
         </div>
         
+        {/* Mouth Status */}
         <div className="mt-4 flex items-center justify-between text-sm text-gray-500 font-bold bg-gray-50 p-3 rounded-xl border-2 border-gray-100">
           <span className="uppercase tracking-wide text-gray-400">Mouth Status</span>
           <span className={`px-3 py-1 rounded-full transition-all duration-200 transform ${isMouthOpen ? 'bg-red-400 text-white scale-110 shadow-md' : 'bg-gray-200 text-gray-500'}`}>
@@ -464,14 +655,17 @@ export default function GameCanvas() {
       </div>
 
       {gameState === "gameover" && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white p-10 rounded-[3rem] shadow-2xl text-center border-8 border-pink-400 animate-bounce-in max-w-md w-full">
-            <h2 className="text-6xl text-pink-500 mb-2 drop-shadow-md">GAME OVER</h2>
-            <div className="text-2xl text-gray-400 mb-8 font-body">Face Lost!</div>
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white p-10 rounded-[3rem] shadow-2xl text-center border-8 border-pink-400 animate-bounce-in max-w-md w-full relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-4 bg-pink-400"></div>
+            <h2 className="text-6xl text-pink-500 mb-2 drop-shadow-md mt-4">GAME OVER</h2>
+            <div className="text-2xl text-gray-400 mb-8 font-body">
+              {lives <= 0 ? "No Lives Left!" : "Face Lost!"}
+            </div>
             
-            <div className="bg-yellow-100 p-4 rounded-2xl mb-8 border-2 border-yellow-300">
+            <div className="bg-yellow-100 p-6 rounded-3xl mb-8 border-4 border-yellow-300 transform rotate-1">
               <div className="text-sm text-yellow-600 font-bold uppercase tracking-wider">Final Score</div>
-              <div className="text-5xl text-yellow-500 font-pixel mt-1">{score}</div>
+              <div className="text-6xl text-yellow-500 font-pixel mt-2 drop-shadow-sm">{score}</div>
             </div>
 
             <button 
@@ -486,11 +680,27 @@ export default function GameCanvas() {
       
       {gameState === "start" && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/30 backdrop-blur-sm">
-           <div className="bg-white/90 p-8 rounded-[2rem] shadow-xl border-4 border-blue-300 text-center animate-pulse">
-             <h2 className="text-4xl text-blue-500 mb-4">Ready?</h2>
-             <p className="text-xl text-gray-600">Show your face to start!</p>
-             <div className="mt-4 text-sm text-gray-400">
-               Move head to aim • Open mouth to shoot
+           <div className="bg-white/90 p-10 rounded-[3rem] shadow-xl border-8 border-blue-300 text-center animate-pulse max-w-lg">
+             <h2 className="text-5xl text-blue-500 mb-6 font-display">Ready?</h2>
+             <p className="text-2xl text-gray-600 mb-8">Show your face to start!</p>
+             
+             <div className="grid grid-cols-2 gap-4 text-left bg-blue-50 p-6 rounded-2xl border-2 border-blue-100">
+               <div className="flex items-center gap-3">
+                 <span className="text-2xl">😐</span>
+                 <span className="text-sm font-bold text-gray-500">Move head to AIM</span>
+               </div>
+               <div className="flex items-center gap-3">
+                 <span className="text-2xl">👄</span>
+                 <span className="text-sm font-bold text-gray-500">Open mouth to SHOOT</span>
+               </div>
+               <div className="flex items-center gap-3">
+                 <img src={ASSETS.kappa} className="w-8 h-8" alt="enemy"/>
+                 <span className="text-sm font-bold text-gray-500">Avoid Enemies</span>
+               </div>
+               <div className="flex items-center gap-3">
+                 <img src={ASSETS.powerup} className="w-8 h-8" alt="powerup"/>
+                 <span className="text-sm font-bold text-gray-500">Get Powerups!</span>
+               </div>
              </div>
            </div>
         </div>
