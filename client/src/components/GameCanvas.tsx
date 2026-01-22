@@ -25,8 +25,9 @@ type Entity = {
 
 // --- Assets ---
 const ASSETS = {
-  cursor: "/images/player_cursor.png",
-  missile: "/images/missile.png",
+  cursor: "/images/player_closed.png",
+  cursorOpen: "/images/player_open.png",
+  missile: "/images/projectile_voice.png",
   enemy1: "/images/enemy_1.png", // Keep old ones as fallback or mix
   enemy2: "/images/enemy_2.png",
   kappa: "/images/yokai_kappa.png",
@@ -136,8 +137,9 @@ export default function GameCanvas() {
     };
     
     imagesRef.current = {
-      cursor: loadImg(ASSETS.cursor),
-      missile: loadImg(ASSETS.missile),
+  cursor: loadImg(ASSETS.cursor),
+  cursorOpen: loadImg(ASSETS.cursorOpen),
+  missile: loadImg(ASSETS.missile),
       enemy1: loadImg(ASSETS.enemy1),
       enemy2: loadImg(ASSETS.enemy2),
       kappa: loadImg(ASSETS.kappa),
@@ -534,11 +536,13 @@ export default function GameCanvas() {
 
     // --- Draw Game Entities ---
     
-    // Cursor
-    const cursorSize = 60;
-    if (imagesRef.current.cursor) {
+    // Player Character (Cursor)
+    const cursorSize = 80;
+    const playerImg = isMouthOpen ? imagesRef.current.cursorOpen : imagesRef.current.cursor;
+    
+    if (playerImg) {
       ctx.drawImage(
-        imagesRef.current.cursor, 
+        playerImg, 
         cursorPosRef.current.x - cursorSize/2, 
         cursorPosRef.current.y - cursorSize/2, 
         cursorSize, 
