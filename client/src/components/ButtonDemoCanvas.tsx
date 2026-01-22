@@ -18,9 +18,26 @@ type ButtonConfig = {
   activeColor: string;
 };
 
+type ButtonAnimation = {
+  id: string;
+  startTime: number;
+  duration: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+};
+
+type StatusDisplay = {
+  label: string;
+  color: string;
+} | null;
+
 // --- Constants ---
 const MOUTH_OPEN_THRESHOLD = 0.05;
 const BUTTON_COOLDOWN = 30; // Frames between button presses
+const ANIMATION_DURATION = 500; // ms
 
 // --- Factory-style Button Configuration ---
 const BUTTONS: ButtonConfig[] = [
@@ -83,18 +100,33 @@ export default function ButtonDemoCanvas() {
   const [lastPressedButton, setLastPressedButton] = useState<string | null>(null);
   const [actionLog, setActionLog] = useState<string[]>([]);
   const [faceDetected, setFaceDetected] = useState(false);
+  const [statusDisplay, setStatusDisplay] = useState<StatusDisplay>(null);
   
   // Refs
   const cursorPosRef = useRef<Point>({ x: 640, y: 360 });
   const buttonCooldownRef = useRef(0);
   const prevHoveredRef = useRef<string | null>(null);
   const sensitivityRef = useRef(sensitivity);
+  const animationsRef = useRef<ButtonAnimation[]>([]);
   
   useEffect(() => { sensitivityRef.current = sensitivity; }, [sensitivity]);
 
   const addLog = useCallback((message: string) => {
     const timestamp = new Date().toLocaleTimeString('ja-JP');
     setActionLog(prev => [`[${timestamp}] ${message}`, ...prev.slice(0, 9)]);
+  }, []);
+
+  const addAnimation = useCallback((btn: ButtonConfig) => {
+    animationsRef.current.push({
+      id: btn.id + Date.now(),
+      startTime: Date.now(),
+      duration: ANIMATION_DURATION,
+      x: btn.x,
+      y: btn.y,
+      width: btn.width,
+      height: btn.height,
+      color: btn.color,
+    });
   }, []);
 
   // MediaPipe Setup
@@ -137,6 +169,49 @@ export default function ButtonDemoCanvas() {
       }
     }
     return null;
+  };
+
+  const drawAnimations = (ctx: CanvasRenderingContext2D) => {
+    const now = Date.now();
+    
+    // Filter out expired animations
+    animationsRef.current = animationsRef.current.filter(anim => {
+      const elapsed = now - anim.startTime;
+      return elapsed < anim.duration;
+    });
+    
+    // Draw active animations
+    animationsRef.current.forEach(anim => {
+      const elapsed = now - anim.startTime;
+      const progress = elapsed / anim.duration;
+      
+      // Expanding ring animation
+      const maxExpand = 50;
+      const expand = progress * maxExpand;
+      const alpha = 1 - progress;
+      
+      ctx.save();
+      ctx.strokeStyle = anim.color;
+      ctx.lineWidth = 6 * (1 - progress);
+      ctx.globalAlpha = alpha;
+      
+      // Draw expanding rectangle
+      ctx.strokeRect(
+        anim.x - expand,
+        anim.y - expand,
+        anim.width + expand * 2,
+        anim.height + expand * 2
+      );
+      
+      // Draw inner flash
+      if (progress < 0.3) {
+        ctx.fillStyle = "#ffffff";
+        ctx.globalAlpha = (0.3 - progress) * 2;
+        ctx.fillRect(anim.x, anim.y, anim.width, anim.height);
+      }
+      
+      ctx.restore();
+    });
   };
 
   const onResults = (results: Results) => {
@@ -281,11 +356,25 @@ export default function ButtonDemoCanvas() {
         addLog(`ボタン「${btn.label}」が押されました`);
         buttonCooldownRef.current = BUTTON_COOLDOWN;
         
-        // Visual feedback - flash
-        ctx.fillStyle = "rgba(255,255,255,0.5)";
-        ctx.fillRect(btn.x, btn.y, btn.width, btn.height);
+        // Add animation
+        addAnimation(btn);
+        
+        // Update status display
+        if (btn.id === "reset") {
+          // Reset button clears status
+          setStatusDisplay(null);
+        } else {
+          // Set status to pressed button
+          setStatusDisplay({
+            label: btn.label,
+            color: btn.color,
+          });
+        }
       }
     });
+
+    // --- Draw Animations ---
+    drawAnimations(ctx);
 
     // --- Draw Laser Pointer ---
     const pointerX = cursorPosRef.current.x;
@@ -384,6 +473,27 @@ export default function ButtonDemoCanvas() {
         height={720}
       />
       
+      {/* Status Display - Top Left */}
+      <div className="absolute top-20 left-4 z-10">
+        <div className="bg-slate-800/95 p-4 rounded-xl shadow-xl border border-slate-600 w-64">
+          <h2 className="text-lg font-bold text-white mb-3 border-b border-slate-600 pb-2">ステータス</h2>
+          {statusDisplay ? (
+            <div 
+              className="p-4 rounded-lg text-center transition-all duration-300 animate-pulse"
+              style={{ backgroundColor: statusDisplay.color }}
+            >
+              <span className="text-white font-bold text-2xl drop-shadow-lg">
+                {statusDisplay.label}
+              </span>
+            </div>
+          ) : (
+            <div className="p-4 rounded-lg bg-slate-700 text-center">
+              <span className="text-slate-400 text-lg">-</span>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Control Panel */}
       <div className="absolute top-20 right-4 z-10 bg-slate-800/95 p-4 rounded-xl shadow-xl border border-slate-600 w-72">
         <h2 className="text-lg font-bold text-white mb-4 border-b border-slate-600 pb-2">操作設定</h2>
