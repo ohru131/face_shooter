@@ -108,6 +108,7 @@ export default function ButtonDemoCanvas() {
   const prevHoveredRef = useRef<string | null>(null);
   const sensitivityRef = useRef(sensitivity);
   const animationsRef = useRef<ButtonAnimation[]>([]);
+  const isMouthOpenRef = useRef(false);
   
   useEffect(() => { sensitivityRef.current = sensitivity; }, [sensitivity]);
 
@@ -247,6 +248,9 @@ export default function ButtonDemoCanvas() {
       ctx.stroke();
     }
 
+    // Local variable for mouth state in this frame
+    let currentMouthOpen = false;
+
     // --- Mirror Video Overlay ---
     ctx.save();
     ctx.translate(width, 0);
@@ -291,8 +295,9 @@ export default function ButtonDemoCanvas() {
       const faceHeight = Math.hypot(topHead.x - chin.x, topHead.y - chin.y);
       const ratio = mouthDist / faceHeight;
       
-      const isOpen = ratio > MOUTH_OPEN_THRESHOLD;
-      setIsMouthOpen(isOpen);
+      currentMouthOpen = ratio > MOUTH_OPEN_THRESHOLD;
+      isMouthOpenRef.current = currentMouthOpen;
+      setIsMouthOpen(currentMouthOpen);
 
     } else {
       setFaceDetected(false);
@@ -319,7 +324,8 @@ export default function ButtonDemoCanvas() {
 
     BUTTONS.forEach(btn => {
       const isHovered = hoveredBtn?.id === btn.id;
-      const isActive = isHovered && isMouthOpen;
+      // Use ref for immediate mouth state
+      const isActive = isHovered && isMouthOpenRef.current;
       
       // Button shadow
       ctx.fillStyle = "rgba(0,0,0,0.3)";
@@ -349,7 +355,7 @@ export default function ButtonDemoCanvas() {
       ctx.textBaseline = "middle";
       ctx.fillText(btn.label, btn.x + btn.width / 2, btn.y + btn.height / 2);
       
-      // Handle button press
+      // Handle button press - use ref for immediate state
       if (isActive && buttonCooldownRef.current <= 0) {
         playSound("click");
         setLastPressedButton(btn.id);
@@ -473,24 +479,26 @@ export default function ButtonDemoCanvas() {
         height={720}
       />
       
-      {/* Status Display - Top Left */}
-      <div className="absolute top-20 left-4 z-10">
-        <div className="bg-slate-800/95 p-4 rounded-xl shadow-xl border border-slate-600 w-64">
-          <h2 className="text-lg font-bold text-white mb-3 border-b border-slate-600 pb-2">ステータス</h2>
-          {statusDisplay ? (
-            <div 
-              className="p-4 rounded-lg text-center transition-all duration-300 animate-pulse"
-              style={{ backgroundColor: statusDisplay.color }}
-            >
-              <span className="text-white font-bold text-2xl drop-shadow-lg">
-                {statusDisplay.label}
-              </span>
-            </div>
-          ) : (
-            <div className="p-4 rounded-lg bg-slate-700 text-center">
-              <span className="text-slate-400 text-lg">-</span>
-            </div>
-          )}
+      {/* Status Display - Top Center (above buttons) */}
+      <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-10">
+        <div className="bg-slate-800/95 px-6 py-3 rounded-xl shadow-xl border border-slate-600 min-w-[200px]">
+          <div className="flex items-center gap-4">
+            <span className="text-white font-bold text-lg">ステータス:</span>
+            {statusDisplay ? (
+              <div 
+                className="px-6 py-2 rounded-lg text-center transition-all duration-300 animate-pulse"
+                style={{ backgroundColor: statusDisplay.color }}
+              >
+                <span className="text-white font-bold text-xl drop-shadow-lg">
+                  {statusDisplay.label}
+                </span>
+              </div>
+            ) : (
+              <div className="px-6 py-2 rounded-lg bg-slate-700 text-center">
+                <span className="text-slate-400 text-xl">-</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
