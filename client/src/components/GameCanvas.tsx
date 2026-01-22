@@ -115,6 +115,7 @@ export default function GameCanvas() {
   const [sensitivity, setSensitivity] = useState(1.5);
   const [isMouthOpen, setIsMouthOpen] = useState(false);
   const [powerLevel, setPowerLevel] = useState(1); // 1: Normal, 2: Double, 3: Triple
+  const [windowSize, setWindowSize] = useState({ width: 1280, height: 720 });
   
   // Refs for game loop logic
   const cursorPosRef = useRef<Point>({ x: 0.5, y: 0.5 });
@@ -128,6 +129,21 @@ export default function GameCanvas() {
   const faceDetectedRef = useRef(false);
   const damageEffectRef = useRef(0); // Frames to show damage effect
 
+  // Handle Resize
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+    
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Init
+    
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Load images on mount
   useEffect(() => {
     const loadImg = (src: string) => {
@@ -137,9 +153,9 @@ export default function GameCanvas() {
     };
     
     imagesRef.current = {
-  cursor: loadImg(ASSETS.cursor),
-  cursorOpen: loadImg(ASSETS.cursorOpen),
-  missile: loadImg(ASSETS.missile),
+      cursor: loadImg(ASSETS.cursor),
+      cursorOpen: loadImg(ASSETS.cursorOpen),
+      missile: loadImg(ASSETS.missile),
       enemy1: loadImg(ASSETS.enemy1),
       enemy2: loadImg(ASSETS.enemy2),
       kappa: loadImg(ASSETS.kappa),
@@ -198,7 +214,9 @@ export default function GameCanvas() {
     let type: "kappa" | "umbrella" | "lantern" = "kappa";
     let img = imagesRef.current.kappa;
     let speed = ENEMY_SPEED_BASE;
-    let size = 70;
+    // Responsive size: smaller on mobile
+    const isMobile = width < 600;
+    let size = isMobile ? 50 : 70;
 
     if (rand < 0.33) {
       type = "kappa";
@@ -232,7 +250,8 @@ export default function GameCanvas() {
   };
 
   const spawnPowerup = (width: number, height: number) => {
-    const size = 50;
+    const isMobile = width < 600;
+    const size = isMobile ? 40 : 50;
     const x = Math.random() * (width - size);
     const y = -size;
     
@@ -250,13 +269,16 @@ export default function GameCanvas() {
   };
 
   const spawnMissile = (x: number, y: number) => {
+    const isMobile = windowSize.width < 600;
+    const size = isMobile ? 30 : 40;
+
     const createMissile = (offsetX: number, angle: number) => {
       entitiesRef.current.push({
         id: Math.random(),
-        x: x - 20 + offsetX,
-        y: y - 40,
-        width: 40,
-        height: 40,
+        x: x - (size/2) + offsetX,
+        y: y - size,
+        width: size,
+        height: size,
         vx: Math.sin(angle) * 5,
         vy: -MISSILE_SPEED,
         type: "missile",
@@ -363,11 +385,13 @@ export default function GameCanvas() {
     const powerups = entitiesRef.current.filter(e => e.type === "powerup");
     
     // Player Hitbox (Cursor)
+    const isMobile = width < 600;
+    const hitboxSize = isMobile ? 40 : 60;
     const playerHitbox = {
-      x: cursorPosRef.current.x - 30,
-      y: cursorPosRef.current.y - 30,
-      width: 60,
-      height: 60
+      x: cursorPosRef.current.x - hitboxSize/2,
+      y: cursorPosRef.current.y - hitboxSize/2,
+      width: hitboxSize,
+      height: hitboxSize
     };
 
     // 1. Missile vs Enemy
@@ -441,7 +465,23 @@ export default function GameCanvas() {
     
     // Draw Background
     if (bgImageRef.current) {
-      ctx.drawImage(bgImageRef.current, 0, 0, width, height);
+      // Cover logic for background
+      const bgRatio = bgImageRef.current.width / bgImageRef.current.height;
+      const canvasRatio = width / height;
+      let drawW, drawH, startX, startY;
+
+      if (canvasRatio > bgRatio) {
+        drawW = width;
+        drawH = width / bgRatio;
+        startX = 0;
+        startY = (height - drawH) / 2;
+      } else {
+        drawH = height;
+        drawW = height * bgRatio;
+        startX = (width - drawW) / 2;
+        startY = 0;
+      }
+      ctx.drawImage(bgImageRef.current, startX, startY, drawW, drawH);
     } else {
       ctx.fillStyle = "#fce7f3";
       ctx.fillRect(0, 0, width, height);
@@ -458,7 +498,15 @@ export default function GameCanvas() {
     ctx.translate(width, 0);
     ctx.scale(-1, 1);
     ctx.globalAlpha = 0.2;
+    
+    // Draw video to cover canvas
+    const video = results.image as unknown as CanvasImageSource; // Cast to CanvasImageSource
+    // Note: results.image is GpuBuffer or ImageBitmap. 
+    // We can just draw it. But we want to maintain aspect ratio or cover.
+    // Webcam is usually 16:9. Canvas matches window.
+    // Let's just stretch for now or simple cover.
     ctx.drawImage(results.image, 0, 0, width, height);
+    
     ctx.globalAlpha = 1.0;
     
     if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
@@ -515,19 +563,6 @@ export default function GameCanvas() {
 
     } else {
       faceDetectedRef.current = false;
-      // Don't end game immediately on face loss, maybe pause?
-      // User requirement: "顔が画面からはずれたらゲーム終了" -> Keep this behavior?
-      // Or maybe just pause. Let's stick to "Game Over" if lost for too long, or immediate.
-      // Let's make it immediate as per request.
-      if (gameStateRef.current === "playing") {
-        // Optional: Add a small buffer so blinking doesn't kill you
-        // For now, immediate.
-        // setGameState("gameover"); 
-        // Actually, let's just pause or show "FACE LOST" warning instead of instant death?
-        // Request said "顔が画面からはずれたらゲーム終了". Okay.
-        // But let's add a small grace period in a real app. Here, strict.
-        // setGameState("gameover");
-      }
     }
     ctx.restore();
 
@@ -537,7 +572,8 @@ export default function GameCanvas() {
     // --- Draw Game Entities ---
     
     // Player Character (Cursor)
-    const cursorSize = 80;
+    const isMobile = width < 600;
+    const cursorSize = isMobile ? 60 : 80;
     const playerImg = isMouthOpen ? imagesRef.current.cursorOpen : imagesRef.current.cursor;
     
     if (playerImg) {
@@ -606,75 +642,85 @@ export default function GameCanvas() {
       <canvas
         ref={canvasRef}
         className="absolute top-0 left-0 w-full h-full object-cover"
-        width={1280}
-        height={720}
+        width={windowSize.width}
+        height={windowSize.height}
       />
       
-      {/* UI Overlay */}
-      <div className="absolute top-4 left-4 z-10 bg-white/90 p-6 rounded-[2rem] shadow-[0_8px_0_rgba(0,0,0,0.1)] border-4 border-pink-300 backdrop-blur-sm w-80 transform transition-all hover:scale-105">
-        <h1 className="text-4xl text-pink-500 mb-4 drop-shadow-sm text-center tracking-wider" style={{ textShadow: '2px 2px 0px #fbcfe8' }}>Face Shooter</h1>
+      {/* UI Overlay - Responsive Layout */}
+      <div className="absolute top-0 left-0 w-full p-2 md:p-4 z-10 flex flex-col md:flex-row md:items-start md:justify-between pointer-events-none">
         
-        {/* Score */}
-        <div className="flex items-center justify-between mb-4 bg-yellow-100 p-3 rounded-xl border-2 border-yellow-300">
-           <span className="text-xl text-yellow-600 font-bold">SCORE</span>
-           <span className="text-3xl text-yellow-600 font-pixel tracking-widest">{score.toString().padStart(6, '0')}</span>
+        {/* Top Left: Title & Score */}
+        <div className="flex flex-row md:flex-col items-center md:items-start justify-between md:justify-start gap-2 md:gap-4 w-full md:w-auto pointer-events-auto">
+          {/* Title - Hide on small mobile during play to save space, or make small */}
+          <h1 className="text-xl md:text-4xl text-pink-500 drop-shadow-sm tracking-wider hidden md:block" style={{ textShadow: '2px 2px 0px #fbcfe8' }}>Face Shooter</h1>
+          
+          {/* Score & Lives Container */}
+          <div className="flex items-center gap-2 md:gap-4 bg-white/80 backdrop-blur-sm p-2 rounded-xl border-2 border-pink-200 shadow-sm">
+             {/* Score */}
+             <div className="flex flex-col md:flex-row items-center gap-1 md:gap-2">
+               <span className="text-xs md:text-lg text-yellow-600 font-bold">SCORE</span>
+               <span className="text-lg md:text-3xl text-yellow-600 font-pixel tracking-widest">{score.toString().padStart(6, '0')}</span>
+             </div>
+             
+             {/* Divider */}
+             <div className="w-px h-8 bg-pink-200 mx-1"></div>
+
+             {/* Lives */}
+             <div className="flex items-center gap-1">
+               {Array.from({ length: MAX_LIVES }).map((_, i) => (
+                 <img 
+                   key={i} 
+                   src={ASSETS.heart} 
+                   className={`w-5 h-5 md:w-8 md:h-8 transition-all ${i < lives ? 'opacity-100 scale-100' : 'opacity-20 scale-75 grayscale'}`} 
+                   alt="heart"
+                 />
+               ))}
+             </div>
+          </div>
         </div>
 
-        {/* Lives */}
-        <div className="flex items-center justify-center gap-2 mb-4 bg-red-50 p-2 rounded-xl border-2 border-red-200">
-          {Array.from({ length: MAX_LIVES }).map((_, i) => (
-            <img 
-              key={i} 
-              src={ASSETS.heart} 
-              className={`w-8 h-8 transition-all ${i < lives ? 'opacity-100 scale-100' : 'opacity-20 scale-75 grayscale'}`} 
-              alt="heart"
+        {/* Top Right: Controls (Sensitivity & Status) */}
+        <div className="flex flex-row md:flex-col items-center md:items-end gap-2 mt-2 md:mt-0 pointer-events-auto">
+          
+          {/* Sensitivity Slider - Compact on mobile */}
+          <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm p-2 rounded-xl border-2 border-pink-200 shadow-sm">
+            <span className="text-xs md:text-sm font-bold text-pink-400 uppercase">SENS</span>
+            <input 
+              type="range" 
+              min="1" 
+              max="3" 
+              step="0.1" 
+              value={sensitivity} 
+              onChange={(e) => setSensitivity(parseFloat(e.target.value))}
+              className="accent-pink-500 h-2 md:h-3 w-20 md:w-32 bg-pink-200 rounded-lg appearance-none cursor-pointer"
             />
-          ))}
+          </div>
+
+          {/* Mouth Status */}
+          <div className={`px-3 py-1 rounded-full text-xs md:text-sm font-bold transition-all duration-200 border-2 ${isMouthOpen ? 'bg-red-400 text-white border-red-500 shadow-md' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+            {isMouthOpen ? "MOUTH OPEN 👄" : "MOUTH CLOSED 😐"}
+          </div>
         </div>
 
-        {/* Sensitivity */}
-        <div className="flex flex-col gap-2 bg-pink-50 p-4 rounded-xl border-2 border-pink-100">
-          <label className="text-sm font-bold text-pink-400 flex justify-between uppercase tracking-wide">
-            <span>Sensitivity</span>
-            <span className="bg-pink-200 px-2 rounded text-pink-600">{sensitivity.toFixed(1)}</span>
-          </label>
-          <input 
-            type="range" 
-            min="1" 
-            max="3" 
-            step="0.1" 
-            value={sensitivity} 
-            onChange={(e) => setSensitivity(parseFloat(e.target.value))}
-            className="accent-pink-500 h-3 bg-pink-200 rounded-lg appearance-none cursor-pointer hover:bg-pink-300 transition-colors"
-          />
-        </div>
-        
-        {/* Mouth Status */}
-        <div className="mt-4 flex items-center justify-between text-sm text-gray-500 font-bold bg-gray-50 p-3 rounded-xl border-2 border-gray-100">
-          <span className="uppercase tracking-wide text-gray-400">Mouth Status</span>
-          <span className={`px-3 py-1 rounded-full transition-all duration-200 transform ${isMouthOpen ? 'bg-red-400 text-white scale-110 shadow-md' : 'bg-gray-200 text-gray-500'}`}>
-            {isMouthOpen ? "OPEN 👄" : "CLOSED 😐"}
-          </span>
-        </div>
       </div>
 
       {gameState === "gameover" && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-white p-10 rounded-[3rem] shadow-2xl text-center border-8 border-pink-400 animate-bounce-in max-w-md w-full relative overflow-hidden">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl text-center border-4 md:border-8 border-pink-400 animate-bounce-in w-full max-w-sm md:max-w-md relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-4 bg-pink-400"></div>
-            <h2 className="text-6xl text-pink-500 mb-2 drop-shadow-md mt-4">GAME OVER</h2>
-            <div className="text-2xl text-gray-400 mb-8 font-body">
+            <h2 className="text-4xl md:text-6xl text-pink-500 mb-2 drop-shadow-md mt-4">GAME OVER</h2>
+            <div className="text-lg md:text-2xl text-gray-400 mb-6 md:mb-8 font-body">
               {lives <= 0 ? "No Lives Left!" : "Face Lost!"}
             </div>
             
-            <div className="bg-yellow-100 p-6 rounded-3xl mb-8 border-4 border-yellow-300 transform rotate-1">
-              <div className="text-sm text-yellow-600 font-bold uppercase tracking-wider">Final Score</div>
-              <div className="text-6xl text-yellow-500 font-pixel mt-2 drop-shadow-sm">{score}</div>
+            <div className="bg-yellow-100 p-4 md:p-6 rounded-3xl mb-6 md:mb-8 border-4 border-yellow-300 transform rotate-1">
+              <div className="text-xs md:text-sm text-yellow-600 font-bold uppercase tracking-wider">Final Score</div>
+              <div className="text-4xl md:text-6xl text-yellow-500 font-pixel mt-2 drop-shadow-sm">{score}</div>
             </div>
 
             <button 
               onClick={restartGame}
-              className="w-full py-4 bg-gradient-to-b from-pink-400 to-pink-500 text-white rounded-2xl font-bold text-2xl shadow-[0_6px_0_#be185d] active:shadow-none active:translate-y-[6px] transition-all hover:brightness-110"
+              className="w-full py-3 md:py-4 bg-gradient-to-b from-pink-400 to-pink-500 text-white rounded-2xl font-bold text-xl md:text-2xl shadow-[0_6px_0_#be185d] active:shadow-none active:translate-y-[6px] transition-all hover:brightness-110"
             >
               TRY AGAIN
             </button>
@@ -683,12 +729,12 @@ export default function GameCanvas() {
       )}
       
       {gameState === "start" && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/30 backdrop-blur-sm">
-           <div className="bg-white/90 p-10 rounded-[3rem] shadow-xl border-8 border-blue-300 text-center animate-pulse max-w-lg">
-             <h2 className="text-5xl text-blue-500 mb-6 font-display">Ready?</h2>
-             <p className="text-2xl text-gray-600 mb-8">Show your face to start!</p>
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/30 backdrop-blur-sm p-4">
+           <div className="bg-white/90 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-xl border-4 md:border-8 border-blue-300 text-center animate-pulse w-full max-w-sm md:max-w-lg">
+             <h2 className="text-3xl md:text-5xl text-blue-500 mb-4 md:mb-6 font-display">Ready?</h2>
+             <p className="text-lg md:text-2xl text-gray-600 mb-6 md:mb-8">Show your face to start!</p>
              
-             <div className="grid grid-cols-2 gap-4 text-left bg-blue-50 p-6 rounded-2xl border-2 border-blue-100">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 text-left bg-blue-50 p-4 md:p-6 rounded-2xl border-2 border-blue-100">
                <div className="flex items-center gap-3">
                  <span className="text-2xl">😐</span>
                  <span className="text-sm font-bold text-gray-500">Move head to AIM</span>
