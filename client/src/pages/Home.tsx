@@ -1,9 +1,9 @@
-import GameCanvas from "@/components/GameCanvas";
+import ButtonDemoCanvas from "@/components/ButtonDemoCanvas";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-background">
-      <GameCanvas />
+    <div className="min-h-screen bg-slate-900">
+      <ButtonDemoCanvas />
     </div>
   );
 }
