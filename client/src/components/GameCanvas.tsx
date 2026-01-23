@@ -117,6 +117,10 @@ export default function GameCanvas() {
   const [lives, setLives] = useState(MAX_LIVES);
   const [sensitivity, setSensitivity] = useState(1.5);
   const [isMouthOpen, setIsMouthOpen] = useState(false);
+  const isMouthOpenRef = useRef(false);
+  useEffect(() => { isMouthOpenRef.current = isMouthOpen; }, [isMouthOpen]);
+  const [difficulty, setDifficulty] = useState(1);
+  const difficultyRef = useRef(1);
   const [powerLevel, setPowerLevel] = useState(1); // 1: Normal, 2: Double, 3: Triple
   const [windowSize, setWindowSize] = useState({ width: 1280, height: 720 });
   
@@ -743,9 +747,15 @@ export default function GameCanvas() {
           </div>
         </div>
 
-        {/* Top Right: Controls (Sensitivity & Status) */}
+          {/* Top Right: Controls (Sensitivity & Status) */}
         <div className="flex flex-row md:flex-col items-center md:items-end gap-2 mt-2 md:mt-0 pointer-events-auto">
           
+          {/* Difficulty Level */}
+          <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full border-2 border-purple-300 shadow-sm">
+            <span className="text-xs md:text-sm font-bold text-purple-500 uppercase">LEVEL</span>
+            <span className="text-lg md:text-xl font-black text-purple-600">{difficulty}</span>
+          </div>
+
           {/* Sensitivity Slider - Compact on mobile */}
           <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm p-2 rounded-xl border-2 border-pink-200 shadow-sm">
             <span className="text-xs md:text-sm font-bold text-pink-400 uppercase">SENS</span>
