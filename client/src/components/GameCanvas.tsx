@@ -769,7 +769,7 @@ export default function GameCanvas() {
   };
 
   return (
-    <div className="relative w-full h-screen bg-pink-50 overflow-hidden flex flex-col items-center justify-center font-display">
+    <div className="relative w-full h-screen bg-background overflow-hidden flex flex-col items-center justify-center font-display">
       <Webcam
         ref={webcamRef}
         className="absolute opacity-0"
@@ -790,18 +790,18 @@ export default function GameCanvas() {
         {/* Top Left: Title & Score */}
         <div className="flex flex-row md:flex-col items-center md:items-start justify-between md:justify-start gap-2 md:gap-4 w-full md:w-auto pointer-events-auto">
           {/* Title - Hide on small mobile during play to save space, or make small */}
-          <h1 className="text-xl md:text-4xl text-pink-500 drop-shadow-sm tracking-wider hidden md:block" style={{ textShadow: '2px 2px 0px #fbcfe8' }}>Face Shooter</h1>
+          <h1 className="text-xl md:text-4xl text-primary drop-shadow-sm tracking-wider hidden md:block" style={{ textShadow: '2px 2px 0px rgba(0,0,0,0.1)' }}>Face Shooter</h1>
           
           {/* Score & Lives Container */}
-          <div className="flex items-center gap-2 md:gap-4 bg-white/80 backdrop-blur-sm p-2 rounded-xl border-2 border-pink-200 shadow-sm">
+          <div className="flex items-center gap-2 md:gap-4 bg-white/80 backdrop-blur-sm p-2 rounded-xl border-2 border-primary/30 shadow-sm">
              {/* Score */}
              <div className="flex flex-col md:flex-row items-center gap-1 md:gap-2">
-               <span className="text-xs md:text-lg text-yellow-600 font-bold">SCORE</span>
-               <span className="text-lg md:text-3xl text-yellow-600 font-pixel tracking-widest">{score.toString().padStart(6, '0')}</span>
+               <span className="text-xs md:text-lg text-accent-foreground font-bold">SCORE</span>
+               <span className="text-lg md:text-3xl text-accent-foreground font-pixel tracking-widest">{score.toString().padStart(6, '0')}</span>
              </div>
              
              {/* Divider */}
-             <div className="w-px h-8 bg-pink-200 mx-1"></div>
+             <div className="w-px h-8 bg-primary/20 mx-1"></div>
 
              {/* Lives */}
              <div className="flex items-center gap-1">
@@ -821,16 +821,16 @@ export default function GameCanvas() {
         <div className="flex flex-row md:flex-col items-center md:items-end gap-2 mt-2 md:mt-0 pointer-events-auto">
           
           {/* Difficulty Level */}
-          <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full border-2 border-purple-300 shadow-sm">
-            <span className="text-xs md:text-sm font-bold text-purple-500 uppercase">LEVEL</span>
-            <span className="text-lg md:text-xl font-black text-purple-600">{difficulty}</span>
+          <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full border-2 border-secondary/30 shadow-sm">
+            <span className="text-xs md:text-sm font-bold text-secondary uppercase">LEVEL</span>
+            <span className="text-lg md:text-xl font-black text-secondary-foreground">{difficulty}</span>
           </div>
 
           {/* Sensitivity Slider - Compact on mobile */}
-          <div className="flex flex-col items-end gap-1 bg-white/80 backdrop-blur-sm p-2 rounded-xl border-2 border-pink-200 shadow-sm">
+          <div className="flex flex-col items-end gap-1 bg-white/80 backdrop-blur-sm p-2 rounded-xl border-2 border-primary/30 shadow-sm">
             <div className="flex items-center gap-2">
-                <span className="text-xs md:text-sm font-bold text-pink-400 uppercase">SENSITIVITY</span>
-                <span className="text-xs font-mono text-pink-600">{sensitivity.toFixed(1)}</span>
+                <span className="text-xs md:text-sm font-bold text-primary uppercase">SENSITIVITY</span>
+                <span className="text-xs font-mono text-primary-foreground">{sensitivity.toFixed(1)}</span>
             </div>
             <input 
               type="range" 
@@ -839,13 +839,13 @@ export default function GameCanvas() {
               step="0.1" 
               value={sensitivity} 
               onChange={(e) => setSensitivity(parseFloat(e.target.value))}
-              className="accent-pink-500 h-2 md:h-3 w-24 md:w-32 bg-pink-200 rounded-lg appearance-none cursor-pointer"
+              className="accent-primary h-2 md:h-3 w-24 md:w-32 bg-primary/20 rounded-lg appearance-none cursor-pointer"
             />
             <div className="text-[10px] text-gray-500">Adjust if mouth not detecting</div>
           </div>
 
           {/* Mouth Status */}
-          <div className={`px-3 py-1 rounded-full text-xs md:text-sm font-bold transition-all duration-200 border-2 ${isMouthOpen ? 'bg-red-400 text-white border-red-500 shadow-md' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+          <div className={`px-3 py-1 rounded-full text-xs md:text-sm font-bold transition-all duration-200 border-2 ${isMouthOpen ? 'bg-destructive text-white border-destructive shadow-md' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
             {isMouthOpen ? "MOUTH OPEN 👄" : "MOUTH CLOSED 😐"}
           </div>
         </div>
@@ -854,21 +854,21 @@ export default function GameCanvas() {
 
       {gameState === "gameover" && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl text-center border-4 md:border-8 border-pink-400 animate-bounce-in w-full max-w-sm md:max-w-md relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-4 bg-pink-400"></div>
-            <h2 className="text-4xl md:text-6xl text-pink-500 mb-2 drop-shadow-md mt-4">GAME OVER</h2>
+          <div className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl text-center border-4 md:border-8 border-primary animate-bounce-in w-full max-w-sm md:max-w-md relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-4 bg-primary"></div>
+            <h2 className="text-4xl md:text-6xl text-primary mb-2 drop-shadow-md mt-4">GAME OVER</h2>
             <div className="text-lg md:text-2xl text-gray-400 mb-6 md:mb-8 font-body">
               {lives <= 0 ? "No Lives Left!" : "Face Lost!"}
             </div>
             
-            <div className="bg-yellow-100 p-4 md:p-6 rounded-3xl mb-6 md:mb-8 border-4 border-yellow-300 transform rotate-1">
-              <div className="text-xs md:text-sm text-yellow-600 font-bold uppercase tracking-wider">Final Score</div>
-              <div className="text-4xl md:text-6xl text-yellow-500 font-pixel mt-2 drop-shadow-sm">{score}</div>
+            <div className="bg-accent/20 p-4 md:p-6 rounded-3xl mb-6 md:mb-8 border-4 border-accent transform rotate-1">
+              <div className="text-xs md:text-sm text-accent-foreground font-bold uppercase tracking-wider">Final Score</div>
+              <div className="text-4xl md:text-6xl text-accent font-pixel mt-2 drop-shadow-sm">{score}</div>
             </div>
 
             <button 
               onClick={restartGame}
-              className="w-full py-3 md:py-4 bg-gradient-to-b from-pink-400 to-pink-500 text-white rounded-2xl font-bold text-xl md:text-2xl shadow-[0_6px_0_#be185d] active:shadow-none active:translate-y-[6px] transition-all hover:brightness-110"
+              className="w-full py-3 md:py-4 bg-gradient-to-b from-primary to-primary/80 text-white rounded-2xl font-bold text-xl md:text-2xl shadow-[0_6px_0_rgba(0,0,0,0.3)] active:shadow-none active:translate-y-[6px] transition-all hover:brightness-110"
             >
               TRY AGAIN
             </button>
@@ -881,7 +881,7 @@ export default function GameCanvas() {
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-white p-6 rounded-2xl shadow-xl text-center animate-pulse">
             <div className="text-4xl mb-2">👀</div>
-            <h2 className="text-2xl font-bold text-pink-500">FACE LOST!</h2>
+            <h2 className="text-2xl font-bold text-primary">FACE LOST!</h2>
             <p className="text-gray-500">Show face to RESTART game</p>
           </div>
         </div>
@@ -889,11 +889,11 @@ export default function GameCanvas() {
 
       {gameState === "start" && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/30 backdrop-blur-sm p-4">
-           <div className="bg-white/90 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-xl border-4 md:border-8 border-blue-300 text-center animate-pulse w-full max-w-sm md:max-w-lg">
-             <h2 className="text-3xl md:text-5xl text-blue-500 mb-4 md:mb-6 font-display">Ready?</h2>
+           <div className="bg-white/90 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-xl border-4 md:border-8 border-secondary text-center animate-pulse w-full max-w-sm md:max-w-lg">
+             <h2 className="text-3xl md:text-5xl text-secondary mb-4 md:mb-6 font-display">Ready?</h2>
              <p className="text-lg md:text-2xl text-gray-600 mb-6 md:mb-8">Show your face to start!</p>
              
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 text-left bg-blue-50 p-4 md:p-6 rounded-2xl border-2 border-blue-100">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 text-left bg-secondary/10 p-4 md:p-6 rounded-2xl border-2 border-secondary/20">
                <div className="flex items-center gap-3">
                  <span className="text-2xl">😐</span>
                  <span className="text-sm font-bold text-gray-500">Move head to AIM</span>
