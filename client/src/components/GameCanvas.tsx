@@ -419,6 +419,8 @@ export default function GameCanvas() {
 
     // 2. Player vs Enemy (Collision)
     enemies.forEach(e => {
+      if (e.y > height + 100) return; // Skip already dead enemies (killed by missile)
+
       if (
         playerHitbox.x < e.x + e.width &&
         playerHitbox.x + playerHitbox.width > e.x &&
@@ -553,19 +555,17 @@ export default function GameCanvas() {
         setGameState("playing");
         setIsFaceMissing(false);
       } else if (gameStateRef.current === "playing" && isFaceMissing) {
-        // Resume from pause if face comes back
+        // If face comes back during playing (after being missing), we restart the game from scratch
+        // User said: "戻ると最初からゲーム開始"
+        restartGame();
+        setGameState("playing");
         setIsFaceMissing(false);
-      } else if (gameStateRef.current === "gameover") {
-        // Auto restart from gameover if face is detected (optional delay could be added)
-        // For now, let's require a manual restart or a specific gesture, 
-        // BUT user asked for "Auto start when face is recognized" even for initial start.
-        // Let's make it so if gameover, we wait a bit then restart if face is present?
-        // Or maybe just keep "TRY AGAIN" button for gameover to avoid infinite loop of death?
-        // User said: "画面上から顔が消えて、また顔認識が始まったら 自動的に ゲームを開始して"
-        // This implies if I leave and come back, it starts.
-        
-        // Let's implement: If Game Over, and face is detected, maybe we don't auto-restart immediately to let user see score.
-        // But if face LEAVES and COMES BACK, then we restart.
+      } else if (gameStateRef.current === "gameover" && isFaceMissing) {
+        // If face comes back after gameover (and being missing), restart game
+        // User said: "ゲームオーバーになっても、顔がはずれて、戻るとゲーム開始にしてください"
+        restartGame();
+        setGameState("playing");
+        setIsFaceMissing(false);
       }
       
       // Shoot
@@ -583,16 +583,15 @@ export default function GameCanvas() {
       
       // Face Missing Logic
       if (gameStateRef.current === "playing") {
+        // User said: "顔が外れるとゲーム終了"
+        // So we set state to gameover or just reset to start?
+        // "戻ると最初からゲーム開始" implies we should go to a state where we wait for face.
+        // Let's set isFaceMissing to true, and when face returns, we restart.
         setIsFaceMissing(true);
-        // We don't pause the game state variable "playing", but we can pause updates or show "FACE MISSING" overlay
-      }
-      
-      // If Game Over and face missing, we are ready to restart when face returns?
-      // Actually, user said: "画面上から顔が消えて、また顔認識が始まったら 自動的に ゲームを開始して"
-      // This sounds like a reset.
-      if (gameStateRef.current === "playing" && !faceDetectedRef.current) {
-         // If face is gone for a while, maybe reset to start?
-         // For now, let's just pause logic in updateGameLogic
+        // Optionally show "Face Lost" screen which acts as a temporary game over
+      } else if (gameStateRef.current === "gameover") {
+        // If already gameover, we just mark face as missing so we know when it returns
+        setIsFaceMissing(true);
       }
     }
     ctx.restore();
@@ -759,13 +758,13 @@ export default function GameCanvas() {
         </div>
       )}
       
-      {/* Face Missing Overlay during Gameplay */}
-      {gameState === "playing" && isFaceMissing && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-2xl shadow-xl text-center animate-bounce">
+      {/* Face Missing Overlay */}
+      {isFaceMissing && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white p-6 rounded-2xl shadow-xl text-center animate-pulse">
             <div className="text-4xl mb-2">👀</div>
             <h2 className="text-2xl font-bold text-pink-500">FACE LOST!</h2>
-            <p className="text-gray-500">Show your face to resume</p>
+            <p className="text-gray-500">Show face to RESTART game</p>
           </div>
         </div>
       )}
