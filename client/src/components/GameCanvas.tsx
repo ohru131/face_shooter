@@ -19,7 +19,7 @@ type Entity = {
   isBoss?: boolean;
   isProjectile?: boolean;
   maxLife?: number;
-  enemyType?: "vampire" | "werewolf" | "mummy" | "frankenstein" | "reaper" | "demon";
+  enemyType?: "vampire" | "werewolf" | "mummy" | "frankenstein" | "gashadokuro" | "kappa" | "lantern" | "ootengu" | "umbrella" | "reaper" | "demon";
   life?: number;
   image?: HTMLImageElement;
   rotation?: number;
@@ -55,9 +55,14 @@ const ASSETS = {
   werewolf: assetPath("images/yokai_werewolf.png"),
   mummy: assetPath("images/yokai_mummy.png"),
   frankenstein: assetPath("images/yokai_frankenstein.png"),
-  // Boss enemies (reuse existing images as bosses)
-  reaper: assetPath("images/yokai_mummy.png"), // Larger mummy as boss
-  demon: assetPath("images/yokai_frankenstein.png"), // Larger frankenstein as boss
+  gashadokuro: assetPath("images/yokai_gashadokuro.png"),
+  kappa: assetPath("images/yokai_kappa.png"),
+  lantern: assetPath("images/yokai_lantern.png"),
+  ootengu: assetPath("images/yokai_ootengu.png"),
+  umbrella: assetPath("images/yokai_umbrella.png"),
+  // Boss enemies
+  reaper: assetPath("images/yokai_gashadokuro.png"), // Gashadokuro as boss
+  demon: assetPath("images/yokai_ootengu.png"), // Ootengu as boss
   
   // Powerup (Pumpkin)
   powerup: assetPath("images/item_powerup.png"),
@@ -304,6 +309,11 @@ export default function GameCanvas() {
       werewolf: loadImg(ASSETS.werewolf),
       mummy: loadImg(ASSETS.mummy),
       frankenstein: loadImg(ASSETS.frankenstein),
+      gashadokuro: loadImg(ASSETS.gashadokuro),
+      kappa: loadImg(ASSETS.kappa),
+      lantern: loadImg(ASSETS.lantern),
+      ootengu: loadImg(ASSETS.ootengu),
+      umbrella: loadImg(ASSETS.umbrella),
       reaper: loadImg(ASSETS.reaper),
       demon: loadImg(ASSETS.demon),
       
@@ -361,7 +371,7 @@ export default function GameCanvas() {
 
   const spawnEnemy = (width: number, height: number, speedMultiplier: number = 1.0, forceBoss: boolean = false) => {
     const rand = Math.random();
-    let type: "vampire" | "werewolf" | "mummy" | "frankenstein" | "reaper" | "demon" = "vampire";
+    let type: "vampire" | "werewolf" | "mummy" | "frankenstein" | "gashadokuro" | "kappa" | "lantern" | "ootengu" | "umbrella" | "reaper" | "demon" = "vampire";
     let img = imagesRef.current.vampire;
     let speed = ENEMY_SPEED_BASE * speedMultiplier;
     const isMobile = width < 600;
@@ -386,23 +396,57 @@ export default function GameCanvas() {
         img = imagesRef.current.demon;
       }
     } else {
-      // Normal Enemy Spawn Logic
-      if (rand < 0.25) {
-        type = "vampire";
-        img = imagesRef.current.vampire;
-        speed = ENEMY_SPEED_BASE * 1.2;
-      } else if (rand < 0.5) {
-        type = "werewolf";
-        img = imagesRef.current.werewolf;
-        speed = ENEMY_SPEED_BASE * 1.0;
-      } else if (rand < 0.75) {
-        type = "mummy";
-        img = imagesRef.current.mummy;
-        speed = ENEMY_SPEED_BASE * 0.8;
-      } else {
-        type = "frankenstein";
-        img = imagesRef.current.frankenstein;
-        speed = ENEMY_SPEED_BASE * 0.9;
+      // Normal Enemy Spawn Logic - 9 enemy types
+      const enemyRand = Math.floor(rand * 9);
+      switch (enemyRand) {
+        case 0:
+          type = "vampire";
+          img = imagesRef.current.vampire;
+          speed = ENEMY_SPEED_BASE * 1.2; // Fast
+          break;
+        case 1:
+          type = "werewolf";
+          img = imagesRef.current.werewolf;
+          speed = ENEMY_SPEED_BASE * 1.1; // Fast
+          break;
+        case 2:
+          type = "mummy";
+          img = imagesRef.current.mummy;
+          speed = ENEMY_SPEED_BASE * 0.8; // Slow
+          break;
+        case 3:
+          type = "frankenstein";
+          img = imagesRef.current.frankenstein;
+          speed = ENEMY_SPEED_BASE * 0.9; // Medium
+          break;
+        case 4:
+          type = "gashadokuro";
+          img = imagesRef.current.gashadokuro;
+          speed = ENEMY_SPEED_BASE * 0.7; // Very slow but tough
+          life = 4;
+          break;
+        case 5:
+          type = "kappa";
+          img = imagesRef.current.kappa;
+          speed = ENEMY_SPEED_BASE * 1.0; // Medium
+          break;
+        case 6:
+          type = "lantern";
+          img = imagesRef.current.lantern;
+          speed = ENEMY_SPEED_BASE * 1.3; // Very fast
+          life = 2;
+          break;
+        case 7:
+          type = "ootengu";
+          img = imagesRef.current.ootengu;
+          speed = ENEMY_SPEED_BASE * 1.15; // Fast
+          break;
+        case 8:
+        default:
+          type = "umbrella";
+          img = imagesRef.current.umbrella;
+          speed = ENEMY_SPEED_BASE * 0.95; // Medium
+          break;
       }
     }
 
