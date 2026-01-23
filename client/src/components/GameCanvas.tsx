@@ -504,7 +504,10 @@ export default function GameCanvas() {
         }
         return false;
       }
-      if (e.y < -100 || e.x < -100 || e.x > width + 100) return false;
+      // Relax top boundary check for Boss (who spawns at -size)
+      // Boss size can be ~200px, so -100 is too strict.
+      const topLimit = e.isBoss ? -500 : -100;
+      if (e.y < topLimit || e.x < -100 || e.x > width + 100) return false;
       
       return true;
     });
