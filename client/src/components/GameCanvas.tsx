@@ -136,6 +136,7 @@ export default function GameCanvas() {
   const [difficulty, setDifficulty] = useState(1);
   const difficultyRef = useRef(1);
   const [showLevelUp, setShowLevelUp] = useState(false);
+  const [showBossWarning, setShowBossWarning] = useState(false);
   const bossActiveRef = useRef(false);
   const bossSpawnedForLevelRef = useRef(0);
   const [powerLevel, setPowerLevel] = useState(1); // 1: Normal, 2: Double, 3: Triple
@@ -403,6 +404,9 @@ export default function GameCanvas() {
         spawnEnemy(width, height, 1.0, true); // Force boss spawn
         bossActiveRef.current = true;
         bossSpawnedForLevelRef.current = targetLevel;
+        setShowBossWarning(true);
+        setTimeout(() => setShowBossWarning(false), 3000);
+        playSound("gameover"); // Use dramatic sound for boss warning
     }
 
     // Spawn Rate: Decrease interval as difficulty increases (min 20 frames)
@@ -439,6 +443,13 @@ export default function GameCanvas() {
                 image: imagesRef.current.missile, // Use fireball image for enemy shot
                 life: 1,
             });
+        } else {
+            // Boss active but not found? It might have escaped or been removed incorrectly.
+            // Check if we should respawn it or reset state.
+            // If bossSpawnedForLevelRef matches targetLevel, it means we spawned it.
+            // If it's gone and we didn't level up, we are stuck.
+            // Let's reset bossActiveRef so it can spawn again.
+             bossActiveRef.current = false;
         }
     }
     
@@ -483,7 +494,13 @@ export default function GameCanvas() {
         // Enemy passed bottom
         if (e.type === "enemy") {
           takeDamage();
-          // Effect for passing bottom (e.g. screen shake or bottom flash - handled by takeDamage visual)
+          
+          // If Boss passed bottom, reset boss state so it respawns
+          if (e.isBoss) {
+              bossActiveRef.current = false;
+              // Reduce boss spawn level ref so it triggers again
+              bossSpawnedForLevelRef.current = targetLevel - 1; 
+          }
         }
         return false;
       }
@@ -950,6 +967,15 @@ export default function GameCanvas() {
         <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
             <div className="text-6xl md:text-9xl font-black text-yellow-400 drop-shadow-[0_5px_5px_rgba(0,0,0,0.5)] animate-bounce-in font-pixel">
                 LEVEL UP!
+            </div>
+        </div>
+      )}
+
+      {showBossWarning && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div className="text-5xl md:text-8xl font-black text-red-600 drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)] animate-pulse font-pixel bg-black/50 p-4 rounded-xl">
+                WARNING!
+                <div className="text-2xl md:text-4xl text-white mt-2">BOSS APPROACHING</div>
             </div>
         </div>
       )}
