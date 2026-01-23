@@ -26,7 +26,7 @@ type Entity = {
 // --- Assets ---
 const ASSETS = {
   cursor: "/images/player_closed.png",
-  cursorOpen: "/images/player_open_huge.png",
+  cursorOpen: "/images/player_open.png", // Try standard open image first
   missile: "/images/projectile_voice.png",
   enemy1: "/images/enemy_1.png", // Keep old ones as fallback or mix
   enemy2: "/images/enemy_2.png",
@@ -635,15 +635,26 @@ export default function GameCanvas() {
     // --- Game Loop Update ---
     updateGameLogic(width, height);
 
-    // --- Draw Game Entities ---
-    
-    // Player Character (Cursor)
+     // Player Character (Cursor)
     const isMobile = width < 600;
     // Make open mouth cursor significantly larger
     const baseSize = isMobile ? 60 : 80;
-    const cursorSize = isMouthOpen ? baseSize * 1.5 : baseSize; 
-    const playerImg = isMouthOpen ? imagesRef.current.cursorOpen : imagesRef.current.cursor;
+    // Use Ref for immediate update in draw loop
+    const isMouthOpenNow = isMouthOpenRef.current;
+    const cursorSize = isMouthOpenNow ? baseSize * 1.5 : baseSize; 
+    const playerImg = isMouthOpenNow ? imagesRef.current.cursorOpen : imagesRef.current.cursor;
     
+    // Draw Aura if mouth is open
+    if (isMouthOpenNow) {
+        ctx.beginPath();
+        ctx.arc(cursorPosRef.current.x, cursorPosRef.current.y, cursorSize/1.5, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255, 100, 100, 0.3)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.lineWidth = 4;
+        ctx.stroke();
+    }
+
     if (playerImg) {
       ctx.drawImage(
         playerImg, 
@@ -652,6 +663,12 @@ export default function GameCanvas() {
         cursorSize, 
         cursorSize
       );
+    } else {
+        // Fallback if image not loaded
+        ctx.fillStyle = isMouthOpenNow ? "red" : "blue";
+        ctx.beginPath();
+        ctx.arc(cursorPosRef.current.x, cursorPosRef.current.y, cursorSize/2, 0, Math.PI*2);
+        ctx.fill();
     }
 
     // Entities
@@ -757,17 +774,21 @@ export default function GameCanvas() {
           </div>
 
           {/* Sensitivity Slider - Compact on mobile */}
-          <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm p-2 rounded-xl border-2 border-pink-200 shadow-sm">
-            <span className="text-xs md:text-sm font-bold text-pink-400 uppercase">SENS</span>
+          <div className="flex flex-col items-end gap-1 bg-white/80 backdrop-blur-sm p-2 rounded-xl border-2 border-pink-200 shadow-sm">
+            <div className="flex items-center gap-2">
+                <span className="text-xs md:text-sm font-bold text-pink-400 uppercase">SENSITIVITY</span>
+                <span className="text-xs font-mono text-pink-600">{sensitivity.toFixed(1)}</span>
+            </div>
             <input 
               type="range" 
-              min="1" 
-              max="3" 
+              min="0.5" 
+              max="5.0" 
               step="0.1" 
               value={sensitivity} 
               onChange={(e) => setSensitivity(parseFloat(e.target.value))}
-              className="accent-pink-500 h-2 md:h-3 w-20 md:w-32 bg-pink-200 rounded-lg appearance-none cursor-pointer"
+              className="accent-pink-500 h-2 md:h-3 w-24 md:w-32 bg-pink-200 rounded-lg appearance-none cursor-pointer"
             />
+            <div className="text-[10px] text-gray-500">Adjust if mouth not detecting</div>
           </div>
 
           {/* Mouth Status */}
