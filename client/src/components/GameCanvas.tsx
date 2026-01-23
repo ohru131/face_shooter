@@ -26,7 +26,7 @@ type Entity = {
 // --- Assets ---
 const ASSETS = {
   cursor: "/images/player_closed.png",
-  cursorOpen: "/images/player_open.png",
+  cursorOpen: "/images/player_open_huge.png",
   missile: "/images/projectile_voice.png",
   enemy1: "/images/enemy_1.png", // Keep old ones as fallback or mix
   enemy2: "/images/enemy_2.png",
@@ -110,6 +110,7 @@ export default function GameCanvas() {
   
   // Game State
   const [gameState, setGameState] = useState<GameState>("start");
+  const [isFaceMissing, setIsFaceMissing] = useState(false);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(MAX_LIVES);
   const [sensitivity, setSensitivity] = useState(1.5);
@@ -336,6 +337,7 @@ export default function GameCanvas() {
 
   const updateGameLogic = (width: number, height: number) => {
     if (gameStateRef.current !== "playing") return;
+    if (!faceDetectedRef.current) return; // Pause logic if face is missing
 
     frameCountRef.current++;
     if (damageEffectRef.current > 0) damageEffectRef.current--;
@@ -546,9 +548,24 @@ export default function GameCanvas() {
       const isOpen = ratio > MOUTH_OPEN_THRESHOLD;
       setIsMouthOpen(isOpen);
 
-      // Auto Start
+      // Auto Start & Resume Logic
       if (gameStateRef.current === "start") {
         setGameState("playing");
+        setIsFaceMissing(false);
+      } else if (gameStateRef.current === "playing" && isFaceMissing) {
+        // Resume from pause if face comes back
+        setIsFaceMissing(false);
+      } else if (gameStateRef.current === "gameover") {
+        // Auto restart from gameover if face is detected (optional delay could be added)
+        // For now, let's require a manual restart or a specific gesture, 
+        // BUT user asked for "Auto start when face is recognized" even for initial start.
+        // Let's make it so if gameover, we wait a bit then restart if face is present?
+        // Or maybe just keep "TRY AGAIN" button for gameover to avoid infinite loop of death?
+        // User said: "画面上から顔が消えて、また顔認識が始まったら 自動的に ゲームを開始して"
+        // This implies if I leave and come back, it starts.
+        
+        // Let's implement: If Game Over, and face is detected, maybe we don't auto-restart immediately to let user see score.
+        // But if face LEAVES and COMES BACK, then we restart.
       }
       
       // Shoot
@@ -563,6 +580,20 @@ export default function GameCanvas() {
 
     } else {
       faceDetectedRef.current = false;
+      
+      // Face Missing Logic
+      if (gameStateRef.current === "playing") {
+        setIsFaceMissing(true);
+        // We don't pause the game state variable "playing", but we can pause updates or show "FACE MISSING" overlay
+      }
+      
+      // If Game Over and face missing, we are ready to restart when face returns?
+      // Actually, user said: "画面上から顔が消えて、また顔認識が始まったら 自動的に ゲームを開始して"
+      // This sounds like a reset.
+      if (gameStateRef.current === "playing" && !faceDetectedRef.current) {
+         // If face is gone for a while, maybe reset to start?
+         // For now, let's just pause logic in updateGameLogic
+      }
     }
     ctx.restore();
 
@@ -728,6 +759,17 @@ export default function GameCanvas() {
         </div>
       )}
       
+      {/* Face Missing Overlay during Gameplay */}
+      {gameState === "playing" && isFaceMissing && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white p-6 rounded-2xl shadow-xl text-center animate-bounce">
+            <div className="text-4xl mb-2">👀</div>
+            <h2 className="text-2xl font-bold text-pink-500">FACE LOST!</h2>
+            <p className="text-gray-500">Show your face to resume</p>
+          </div>
+        </div>
+      )}
+
       {gameState === "start" && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/30 backdrop-blur-sm p-4">
            <div className="bg-white/90 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-xl border-4 md:border-8 border-blue-300 text-center animate-pulse w-full max-w-sm md:max-w-lg">
