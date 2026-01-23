@@ -111,6 +111,8 @@ export default function GameCanvas() {
   // Game State
   const [gameState, setGameState] = useState<GameState>("start");
   const [isFaceMissing, setIsFaceMissing] = useState(false);
+  const isFaceMissingRef = useRef(false);
+  useEffect(() => { isFaceMissingRef.current = isFaceMissing; }, [isFaceMissing]);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(MAX_LIVES);
   const [sensitivity, setSensitivity] = useState(1.5);
@@ -562,7 +564,7 @@ export default function GameCanvas() {
         restartGame(); // Ensure fresh start
         setGameState("playing");
         setIsFaceMissing(false);
-      } else if (isFaceMissing) {
+      } else if (isFaceMissingRef.current) {
         // If face was missing (in any state: playing, gameover, start), and now detected:
         // "戻ると最初からゲーム開始" -> Always restart
         restartGame();
