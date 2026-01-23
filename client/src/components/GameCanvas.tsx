@@ -519,9 +519,9 @@ export default function GameCanvas() {
         }
         return false;
       }
-      // Relax top boundary check for Boss (who spawns at -size)
-      // Boss size can be ~200px, so -100 is too strict.
-      const topLimit = e.isBoss ? -500 : -100;
+      // Relax top boundary check for larger enemies (who spawn at -size)
+      // Max size is around 420px (Boss), so -500 is safe for everyone.
+      const topLimit = -600;
       if (e.y < topLimit || e.x < -100 || e.x > width + 100) return false;
       
       return true;
