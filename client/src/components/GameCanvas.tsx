@@ -422,10 +422,21 @@ export default function GameCanvas() {
     });
 
     // 2. Player vs Enemy (Collision)
+    // Re-fetch enemies to ensure we are checking against current state
+    // (Though in this synchronous loop, 'enemies' array from line 388 still holds references to objects)
+    // The issue might be that we are modifying 'e' in the missile loop (changing type to particle)
+    // and then filtering 'enemies' based on type="enemy" at line 388 BEFORE the missile loop runs?
+    // Wait, line 388 runs before missile loop. So 'enemies' array contains all enemies that were enemies at start of frame.
+    // In missile loop (line 402), we change e.type to "particle".
+    // In player loop (line 425), we iterate over the SAME 'enemies' array.
+    // So 'e' inside this loop IS the same object.
+    // We need to check if e.type is still "enemy".
+    
     enemies.forEach(e => {
-      if (e.type !== "enemy") return; // Double check type
-      if ((e.life ?? 0) <= 0) return; // Skip dead enemies
-      if (e.y > height + 100) return; // Skip out of bounds enemies
+      // Check if enemy is still valid (might have been killed by missile in this same frame)
+      if (e.type !== "enemy") return; 
+      if ((e.life ?? 0) <= 0) return; 
+      if (e.y > height) return; // Skip out of bounds enemies (handled by removal logic)
 
       if (
         playerHitbox.x < e.x + e.width &&
@@ -433,11 +444,14 @@ export default function GameCanvas() {
         playerHitbox.y < e.y + e.height &&
         playerHitbox.y + playerHitbox.height > e.y
       ) {
+        // Collision detected!
         spawnExplosion(e.x + e.width/2, e.y + e.height/2, "red");
         takeDamage();
-        e.y = height + 999; // Remove enemy
-        e.life = 0; // Mark as dead
-        e.type = "particle"; // Change type to avoid any further collision checks
+        
+        // Kill enemy
+        e.y = height + 999; 
+        e.life = 0; 
+        e.type = "particle"; // Prevent double counting
       }
     });
 
