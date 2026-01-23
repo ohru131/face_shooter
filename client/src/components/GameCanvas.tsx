@@ -40,6 +40,7 @@ const ASSETS = {
   cursorOpen: "/images/player_open.png",
   
   missile: "/images/fireball.png",
+  enemyFireball: "/images/enemy_fireball.png",
   enemy1: "/images/enemy_1.png", // Keep old ones as fallback or mix
   enemy2: "/images/enemy_2.png",
   kappa: "/images/yokai_kappa.png",
@@ -191,6 +192,7 @@ export default function GameCanvas() {
       cursor: loadImg(ASSETS.cursor),
       cursorOpen: loadImg(ASSETS.cursorOpen),
       missile: loadImg(ASSETS.missile),
+      enemyFireball: loadImg(ASSETS.enemyFireball),
       enemy1: loadImg(ASSETS.enemy1),
       enemy2: loadImg(ASSETS.enemy2),
       kappa: loadImg(ASSETS.kappa),
@@ -251,18 +253,20 @@ export default function GameCanvas() {
     let speed = ENEMY_SPEED_BASE * speedMultiplier;
     // Responsive size: smaller on mobile
     const isMobile = width < 600;
-    let size = isMobile ? 50 : 70;
+    // Normal enemy size scaled up 3x (base was ~70, now ~210)
+    let size = isMobile ? 100 : 210; 
     let isBoss = false;
-    let life = 1;
+    let life = 3; // Normal enemy HP increased to 3
 
     // Boss Spawn Logic
     if (forceBoss) {
         isBoss = true;
-        size *= 3;
-        life = 5; // Boss HP increased to 5
-        speed = ENEMY_SPEED_BASE * 0.8; // Boss moves at decent speed (not too slow)
-        type = "lantern"; // Boss appearance
-        img = imagesRef.current.lantern; // Placeholder, ideally specific boss image
+        // Boss size scaled up 6x (base was ~70, now ~420)
+        size = isMobile ? 200 : 420;
+        life = 6; // Boss HP increased to 6
+        speed = ENEMY_SPEED_BASE * 0.8; 
+        type = "lantern"; 
+        img = imagesRef.current.lantern; 
     } else {
         // Normal Enemy Spawn Logic
         if (rand < 0.33) {
@@ -302,7 +306,8 @@ export default function GameCanvas() {
 
   const spawnPowerup = (width: number, height: number) => {
     const isMobile = width < 600;
-    const size = isMobile ? 40 : 50;
+    // Powerup size scaled up 3x (base was ~50, now ~150)
+    const size = isMobile ? 80 : 150;
     const x = Math.random() * (width - size);
     const y = -size;
     
@@ -422,36 +427,36 @@ export default function GameCanvas() {
     }
     
     // Boss Attack Logic
-    if (bossActiveRef.current && frameCountRef.current % 60 === 0) {
-        // Find boss
-        const boss = entitiesRef.current.find(e => e.isBoss && e.type === "enemy");
+    if (bossActiveRef.current && frameCountRef.current % 120 === 0) { // Every 2 seconds
+        const boss = entitiesRef.current.find(e => e.isBoss);
         if (boss) {
-            // Shoot at player
+            // Shoot fireball at player
             const dx = cursorPosRef.current.x - (boss.x + boss.width/2);
             const dy = cursorPosRef.current.y - (boss.y + boss.height/2);
-            const angle = Math.atan2(dy, dx);
+            const dist = Math.hypot(dx, dy);
+            const speed = 10;
             
             entitiesRef.current.push({
                 id: Math.random(),
-                x: boss.x + boss.width/2,
+                x: boss.x + boss.width/2 - 40, // Centered
                 y: boss.y + boss.height/2,
-                width: 20,
-                height: 20,
-                vx: Math.cos(angle) * 5,
-                vy: Math.sin(angle) * 5,
-                type: "enemy", // Treat as enemy for collision
-                enemyType: "lantern", // Re-use lantern image or similar
-                image: imagesRef.current.missile, // Use fireball image for enemy shot
+                width: 80, // Larger projectile
+                height: 80,
+                vx: (dx / dist) * speed,
+                vy: (dy / dist) * speed,
+                type: "enemy", // Treat as enemy for collision with player
+                image: imagesRef.current.enemyFireball, // Use new purple fireball
                 life: 1,
+                maxLife: 1
             });
-        } else {
-            // Boss active but not found? It might have escaped or been removed incorrectly.
-            // Check if we should respawn it or reset state.
-            // If bossSpawnedForLevelRef matches targetLevel, it means we spawned it.
-            // If it's gone and we didn't level up, we are stuck.
-            // Let's reset bossActiveRef so it can spawn again.
-             bossActiveRef.current = false;
         }
+    } else if (bossActiveRef.current) {
+        // Boss active but not found? It might have escaped or been removed incorrectly.
+        // Check if we should respawn it or reset state.
+        // If bossSpawnedForLevelRef matches targetLevel, it means we spawned it.
+        // If it's gone and we didn't level up, we are stuck.
+        // Let's reset bossActiveRef so it can spawn again.
+        bossActiveRef.current = false;
     }
     
     // Spawn Powerup (Rare)
@@ -520,7 +525,8 @@ export default function GameCanvas() {
     
     // Player Hitbox (Cursor)
     const isMobile = width < 600;
-    const hitboxSize = isMobile ? 40 : 60;
+    // Player hitbox scaled up 3x (base was ~60, now ~180)
+    const hitboxSize = isMobile ? 80 : 180;
     const playerHitbox = {
       x: cursorPosRef.current.x - hitboxSize/2,
       y: cursorPosRef.current.y - hitboxSize/2,
@@ -566,7 +572,11 @@ export default function GameCanvas() {
                   difficultyRef.current = newLevel;
                   setShowLevelUp(true);
                   setTimeout(() => setShowLevelUp(false), 3000);
-                  playSound("powerup"); // Reuse powerup sound for level up
+                  playSound("powerup"); 
+                  
+                  // Reset boss spawn tracking so normal enemies spawn again
+                  // We set bossSpawnedForLevelRef to the NEW level, so it won't spawn again until score triggers it
+                  bossSpawnedForLevelRef.current = newLevel; 
               }
           }
         }
