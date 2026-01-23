@@ -458,16 +458,8 @@ export default function GameCanvas() {
       });
     };
 
+    // Single shot only
     createMissile(0, 0);
-    
-    if (powerLevel >= 2) {
-      createMissile(-30, -0.1);
-      createMissile(30, 0.1);
-    }
-    if (powerLevel >= 3) {
-      createMissile(-60, -0.2);
-      createMissile(60, 0.2);
-    }
     
     playSound("shoot");
   };
