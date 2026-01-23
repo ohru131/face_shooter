@@ -18,7 +18,7 @@ type Entity = {
   type: "missile" | "enemy" | "particle" | "powerup";
   isBoss?: boolean;
   maxLife?: number;
-  enemyType?: "kappa" | "umbrella" | "lantern";
+  enemyType?: "kappa" | "umbrella" | "lantern" | "gashadokuro" | "ootengu";
   life?: number; // For particles
   image?: HTMLImageElement;
   rotation?: number;
@@ -46,6 +46,8 @@ const ASSETS = {
   kappa: "/images/yokai_kappa.png",
   umbrella: "/images/yokai_umbrella.png",
   lantern: "/images/yokai_lantern.png",
+  gashadokuro: "/images/yokai_gashadokuro.png",
+  ootengu: "/images/yokai_ootengu.png",
   powerup: "/images/onigiri.png",
       bg: "/images/background_jp.png",
   heart: "/images/icon_sakura.png",
@@ -198,6 +200,8 @@ export default function GameCanvas() {
       kappa: loadImg(ASSETS.kappa),
       umbrella: loadImg(ASSETS.umbrella),
       lantern: loadImg(ASSETS.lantern),
+      gashadokuro: loadImg(ASSETS.gashadokuro),
+      ootengu: loadImg(ASSETS.ootengu),
       powerup: loadImg("/images/onigiri.png"), // Use onigiri for powerup
       heart: loadImg(ASSETS.heart),
     };
@@ -248,7 +252,7 @@ export default function GameCanvas() {
 
   const spawnEnemy = (width: number, height: number, speedMultiplier: number = 1.0, forceBoss: boolean = false) => {
     const rand = Math.random();
-    let type: "kappa" | "umbrella" | "lantern" = "kappa";
+    let type: "kappa" | "umbrella" | "lantern" | "gashadokuro" | "ootengu" = "kappa";
     let img = imagesRef.current.kappa;
     let speed = ENEMY_SPEED_BASE * speedMultiplier;
     // Responsive size: smaller on mobile
@@ -265,8 +269,19 @@ export default function GameCanvas() {
         size = isMobile ? 200 : 420;
         life = 6; // Boss HP increased to 6
         speed = ENEMY_SPEED_BASE * 0.8; 
-        type = "lantern"; 
-        img = imagesRef.current.lantern; 
+        
+        // Randomize Boss
+        const bossRand = Math.random();
+        if (bossRand < 0.33) {
+            type = "lantern";
+            img = imagesRef.current.lantern;
+        } else if (bossRand < 0.66) {
+            type = "gashadokuro";
+            img = imagesRef.current.gashadokuro;
+        } else {
+            type = "ootengu";
+            img = imagesRef.current.ootengu;
+        }
     } else {
         // Normal Enemy Spawn Logic
         if (rand < 0.33) {
@@ -534,8 +549,8 @@ export default function GameCanvas() {
     
     // Player Hitbox (Cursor)
     const isMobile = width < 600;
-    // Player hitbox scaled up 3x (base was ~60, now ~180)
-    const hitboxSize = isMobile ? 80 : 180;
+    // Player hitbox scaled up even more (base was ~180, now ~250)
+    const hitboxSize = isMobile ? 100 : 250;
     const playerHitbox = {
       x: cursorPosRef.current.x - hitboxSize/2,
       y: cursorPosRef.current.y - hitboxSize/2,
@@ -784,7 +799,7 @@ export default function GameCanvas() {
 
      // Player Character (Cursor)
     const isMobile = width < 600;
-    const baseSize = isMobile ? 80 : 100; // Slightly larger for new character
+    const baseSize = isMobile ? 120 : 250; // Significantly larger for new character (was 80/100)
     
     // Calculate Lean based on movement
     const currentX = cursorPosRef.current.x;
