@@ -16,6 +16,8 @@ type Entity = {
   vx: number;
   vy: number;
   type: "missile" | "enemy" | "particle" | "powerup";
+  isBoss?: boolean;
+  maxLife?: number;
   enemyType?: "kappa" | "umbrella" | "lantern";
   life?: number; // For particles
   image?: HTMLImageElement;
@@ -246,19 +248,29 @@ export default function GameCanvas() {
     // Responsive size: smaller on mobile
     const isMobile = width < 600;
     let size = isMobile ? 50 : 70;
+    let isBoss = false;
+    let life = 1;
+
+    // 10% chance to spawn a Boss (3x size, 3 HP)
+    if (Math.random() < 0.1) {
+        isBoss = true;
+        size *= 3;
+        life = 3;
+        speed *= 0.5; // Boss moves slower
+    }
 
     if (rand < 0.33) {
       type = "kappa";
       img = imagesRef.current.kappa;
-      speed = ENEMY_SPEED_BASE * 1.2; // Fast
+      if (!isBoss) speed = ENEMY_SPEED_BASE * 1.2; 
     } else if (rand < 0.66) {
       type = "umbrella";
       img = imagesRef.current.umbrella;
-      speed = ENEMY_SPEED_BASE * 0.8; // Slow but maybe erratic?
+      if (!isBoss) speed = ENEMY_SPEED_BASE * 0.8; 
     } else {
       type = "lantern";
       img = imagesRef.current.lantern;
-      speed = ENEMY_SPEED_BASE;
+      if (!isBoss) speed = ENEMY_SPEED_BASE;
     }
 
     const x = Math.random() * (width - size);
@@ -275,7 +287,9 @@ export default function GameCanvas() {
       type: "enemy",
       enemyType: type,
       image: img,
-      life: 1, // Initialize life to 1 so it's not treated as dead
+      life: life, 
+      maxLife: life,
+      isBoss: isBoss,
     });
   };
 
@@ -373,7 +387,12 @@ export default function GameCanvas() {
 
     // Difficulty Scaling
     // Increase difficulty every 600 frames (approx 10 seconds)
-    const difficultyLevel = Math.floor(frameCountRef.current / 600);
+    // Difficulty Scaling based on Score (1 level per 500 points)
+    const difficultyLevel = Math.floor(scoreRef.current / 500) + 1;
+    if (difficultyRef.current !== difficultyLevel) {
+        setDifficulty(difficultyLevel);
+        difficultyRef.current = difficultyLevel;
+    }
     
     // Spawn Rate: Decrease interval as difficulty increases (min 20 frames)
     const currentSpawnRate = Math.max(20, SPAWN_RATE - (difficultyLevel * 5));
@@ -399,6 +418,22 @@ export default function GameCanvas() {
       if (entity.type === "particle" && entity.life !== undefined) {
         entity.life--;
         entity.vy += 0.2; // Gravity
+      }
+
+      // Add sparkle effect to Powerups
+      if (entity.type === "powerup" && frameCountRef.current % 5 === 0) {
+          entitiesRef.current.push({
+            id: Math.random(),
+            x: entity.x + Math.random() * entity.width,
+            y: entity.y + Math.random() * entity.height,
+            width: 5,
+            height: 5,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            type: "particle",
+            life: 20,
+            image: undefined, // Color particle
+          });
       }
     });
 
@@ -444,16 +479,27 @@ export default function GameCanvas() {
           m.y < e.y + e.height &&
           m.y + m.height > e.y
         ) {
-          spawnExplosion(e.x + e.width/2, e.y + e.height/2);
-          playSound("explosion");
-          
           m.y = -999; // Remove missile
-          e.y = height + 999; // Remove enemy
-          e.life = 0; // Mark as dead explicitly
-          e.type = "particle"; // Change type to avoid any further collision checks
           
-          scoreRef.current += 100;
-          setScore(scoreRef.current);
+          // Damage Enemy
+          if (e.life) e.life--;
+          
+          if (e.life && e.life > 0) {
+              // Hit effect but not dead
+              spawnExplosion(e.x + e.width/2, e.y + e.height/2, "white");
+              playSound("damage"); // Use damage sound for hit
+          } else {
+              // Killed
+              spawnExplosion(e.x + e.width/2, e.y + e.height/2);
+              playSound("explosion");
+              
+              e.y = height + 999; // Remove enemy
+              e.life = 0; // Mark as dead explicitly
+              e.type = "particle"; // Change type to avoid any further collision checks
+              
+              scoreRef.current += e.isBoss ? 500 : 100; // More points for boss
+              setScore(scoreRef.current);
+          }
         }
       });
     });
@@ -823,7 +869,7 @@ export default function GameCanvas() {
           {/* Difficulty Level */}
           <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full border-2 border-secondary/30 shadow-sm">
             <span className="text-xs md:text-sm font-bold text-secondary uppercase">LEVEL</span>
-            <span className="text-lg md:text-xl font-black text-secondary-foreground">{difficulty}</span>
+            <span className="text-lg md:text-xl font-black text-primary font-pixel">{difficulty}</span>
           </div>
 
           {/* Sensitivity Slider - Compact on mobile */}
