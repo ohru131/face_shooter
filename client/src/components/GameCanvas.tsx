@@ -135,6 +135,9 @@ export default function GameCanvas() {
   useEffect(() => { isMouthOpenRef.current = isMouthOpen; }, [isMouthOpen]);
   const [difficulty, setDifficulty] = useState(1);
   const difficultyRef = useRef(1);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const bossActiveRef = useRef(false);
+  const bossSpawnedForLevelRef = useRef(0);
   const [powerLevel, setPowerLevel] = useState(1); // 1: Normal, 2: Double, 3: Triple
   const [windowSize, setWindowSize] = useState({ width: 1280, height: 720 });
   
@@ -240,7 +243,7 @@ export default function GameCanvas() {
   const gameStateRef = useRef(gameState);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
 
-  const spawnEnemy = (width: number, height: number, speedMultiplier: number = 1.0) => {
+  const spawnEnemy = (width: number, height: number, speedMultiplier: number = 1.0, forceBoss: boolean = false) => {
     const rand = Math.random();
     let type: "kappa" | "umbrella" | "lantern" = "kappa";
     let img = imagesRef.current.kappa;
@@ -251,12 +254,14 @@ export default function GameCanvas() {
     let isBoss = false;
     let life = 1;
 
-    // 10% chance to spawn a Boss (3x size, 3 HP)
-    if (Math.random() < 0.1) {
+    // Boss Spawn Logic
+    if (forceBoss) {
         isBoss = true;
         size *= 3;
-        life = 3;
-        speed *= 0.5; // Boss moves slower
+        life = 5; // Boss HP increased to 5
+        speed *= 0.3; // Boss moves very slow
+        type = "lantern"; // Boss appearance
+        img = imagesRef.current.lantern; // Placeholder, ideally specific boss image
     }
 
     if (rand < 0.33) {
@@ -385,24 +390,56 @@ export default function GameCanvas() {
     frameCountRef.current++;
     if (damageEffectRef.current > 0) damageEffectRef.current--;
 
-    // Difficulty Scaling
-    // Increase difficulty every 600 frames (approx 10 seconds)
-    // Difficulty Scaling based on Score (1 level per 500 points)
-    const difficultyLevel = Math.floor(scoreRef.current / 500) + 1;
-    if (difficultyRef.current !== difficultyLevel) {
-        setDifficulty(difficultyLevel);
-        difficultyRef.current = difficultyLevel;
-    }
+    // --- Leveling System ---
+    // Calculate target level based on score (1 level per 500 points)
+    const targetLevel = Math.floor(scoreRef.current / 500) + 1;
     
+    // If we have enough score for next level, but haven't spawned boss yet, spawn boss
+    // Boss spawns when we are ready to advance from current difficulty to next
+    // e.g. difficulty 1, score 500 -> target 2. Spawn boss. Kill boss -> difficulty 2.
+    
+    if (targetLevel > difficultyRef.current && !bossActiveRef.current && bossSpawnedForLevelRef.current < targetLevel) {
+        // Time to spawn boss!
+        spawnEnemy(width, height, 1.0, true); // Force boss spawn
+        bossActiveRef.current = true;
+        bossSpawnedForLevelRef.current = targetLevel;
+    }
+
     // Spawn Rate: Decrease interval as difficulty increases (min 20 frames)
-    const currentSpawnRate = Math.max(20, SPAWN_RATE - (difficultyLevel * 5));
+    const currentSpawnRate = Math.max(20, SPAWN_RATE - (difficultyRef.current * 5));
     
     // Enemy Speed Multiplier: Increase speed slightly with difficulty
-    const speedMultiplier = 1 + (difficultyLevel * 0.1);
+    const speedMultiplier = 1 + (difficultyRef.current * 0.1);
 
-    // Spawn Enemies
-    if (frameCountRef.current % currentSpawnRate === 0) {
-      spawnEnemy(width, height, speedMultiplier);
+    // Spawn Enemies (Only if boss is NOT active)
+    if (!bossActiveRef.current && frameCountRef.current % currentSpawnRate === 0) {
+      spawnEnemy(width, height, speedMultiplier, false);
+    }
+    
+    // Boss Attack Logic
+    if (bossActiveRef.current && frameCountRef.current % 60 === 0) {
+        // Find boss
+        const boss = entitiesRef.current.find(e => e.isBoss && e.type === "enemy");
+        if (boss) {
+            // Shoot at player
+            const dx = cursorPosRef.current.x - (boss.x + boss.width/2);
+            const dy = cursorPosRef.current.y - (boss.y + boss.height/2);
+            const angle = Math.atan2(dy, dx);
+            
+            entitiesRef.current.push({
+                id: Math.random(),
+                x: boss.x + boss.width/2,
+                y: boss.y + boss.height/2,
+                width: 20,
+                height: 20,
+                vx: Math.cos(angle) * 5,
+                vy: Math.sin(angle) * 5,
+                type: "enemy", // Treat as enemy for collision
+                enemyType: "lantern", // Re-use lantern image or similar
+                image: imagesRef.current.missile, // Use fireball image for enemy shot
+                life: 1,
+            });
+        }
     }
     
     // Spawn Powerup (Rare)
@@ -497,8 +534,19 @@ export default function GameCanvas() {
               e.life = 0; // Mark as dead explicitly
               e.type = "particle"; // Change type to avoid any further collision checks
               
-              scoreRef.current += e.isBoss ? 500 : 100; // More points for boss
+              scoreRef.current += e.isBoss ? 1000 : 100; // More points for boss
               setScore(scoreRef.current);
+              
+              if (e.isBoss) {
+                  bossActiveRef.current = false;
+                  // Level Up!
+                  const newLevel = difficultyRef.current + 1;
+                  setDifficulty(newLevel);
+                  difficultyRef.current = newLevel;
+                  setShowLevelUp(true);
+                  setTimeout(() => setShowLevelUp(false), 3000);
+                  playSound("powerup"); // Reuse powerup sound for level up
+              }
           }
         }
       });
@@ -897,6 +945,14 @@ export default function GameCanvas() {
         </div>
 
       </div>
+
+      {showLevelUp && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div className="text-6xl md:text-9xl font-black text-yellow-400 drop-shadow-[0_5px_5px_rgba(0,0,0,0.5)] animate-bounce-in font-pixel">
+                LEVEL UP!
+            </div>
+        </div>
+      )}
 
       {gameState === "gameover" && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
