@@ -212,11 +212,11 @@ export default function GameCanvas() {
   const gameStateRef = useRef(gameState);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
 
-  const spawnEnemy = (width: number, height: number) => {
+  const spawnEnemy = (width: number, height: number, speedMultiplier: number = 1.0) => {
     const rand = Math.random();
     let type: "kappa" | "umbrella" | "lantern" = "kappa";
     let img = imagesRef.current.kappa;
-    let speed = ENEMY_SPEED_BASE;
+    let speed = ENEMY_SPEED_BASE * speedMultiplier;
     // Responsive size: smaller on mobile
     const isMobile = width < 600;
     let size = isMobile ? 50 : 70;
@@ -345,9 +345,19 @@ export default function GameCanvas() {
     frameCountRef.current++;
     if (damageEffectRef.current > 0) damageEffectRef.current--;
 
+    // Difficulty Scaling
+    // Increase difficulty every 600 frames (approx 10 seconds)
+    const difficultyLevel = Math.floor(frameCountRef.current / 600);
+    
+    // Spawn Rate: Decrease interval as difficulty increases (min 20 frames)
+    const currentSpawnRate = Math.max(20, SPAWN_RATE - (difficultyLevel * 5));
+    
+    // Enemy Speed Multiplier: Increase speed slightly with difficulty
+    const speedMultiplier = 1 + (difficultyLevel * 0.1);
+
     // Spawn Enemies
-    if (frameCountRef.current % SPAWN_RATE === 0) {
-      spawnEnemy(width, height);
+    if (frameCountRef.current % currentSpawnRate === 0) {
+      spawnEnemy(width, height, speedMultiplier);
     }
     
     // Spawn Powerup (Rare)
@@ -625,7 +635,9 @@ export default function GameCanvas() {
     
     // Player Character (Cursor)
     const isMobile = width < 600;
-    const cursorSize = isMobile ? 60 : 80;
+    // Make open mouth cursor significantly larger
+    const baseSize = isMobile ? 60 : 80;
+    const cursorSize = isMouthOpen ? baseSize * 1.5 : baseSize; 
     const playerImg = isMouthOpen ? imagesRef.current.cursorOpen : imagesRef.current.cursor;
     
     if (playerImg) {
