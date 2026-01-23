@@ -37,13 +37,13 @@ const ASSETS = {
   cursor: "/images/player_closed.png",
   cursorOpen: "/images/player_open.png",
   
-  missile: "/images/projectile_voice.png",
+  missile: "/images/fireball.png",
   enemy1: "/images/enemy_1.png", // Keep old ones as fallback or mix
   enemy2: "/images/enemy_2.png",
   kappa: "/images/yokai_kappa.png",
   umbrella: "/images/yokai_umbrella.png",
   lantern: "/images/yokai_lantern.png",
-  powerup: "/images/item_powerup.png",
+  powerup: "/images/onigiri.png",
       bg: "/images/background_jp.png",
   heart: "/images/icon_heart.png",
 };
@@ -51,6 +51,8 @@ const ASSETS = {
   // --- Audio Context ---
 const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
 const bgmAudio = new Audio("/sounds/bgm_japanese.mp3");
+const shootAudio = new Audio("/sounds/shoot.mp3");
+const explosionAudio = new Audio("/sounds/explosion.mp3");
 bgmAudio.loop = true;
 bgmAudio.volume = 0.4;
 
@@ -58,6 +60,18 @@ const playSound = (type: "shoot" | "explosion" | "damage" | "powerup" | "gameove
   if (audioCtx.state === "suspended") {
     audioCtx.resume();
   }
+
+  if (type === "shoot") {
+    shootAudio.currentTime = 0;
+    shootAudio.play().catch(e => console.log("Shoot sound failed", e));
+    return;
+  } else if (type === "explosion") {
+    explosionAudio.currentTime = 0;
+    explosionAudio.play().catch(e => console.log("Explosion sound failed", e));
+    return;
+  }
+
+  // Fallback/Other sounds use Oscillator
   const osc = audioCtx.createOscillator();
   const gainNode = audioCtx.createGain();
 
@@ -66,23 +80,7 @@ const playSound = (type: "shoot" | "explosion" | "damage" | "powerup" | "gameove
 
   const now = audioCtx.currentTime;
 
-  if (type === "shoot") {
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(440, now);
-    osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
-    gainNode.gain.setValueAtTime(0.1, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-    osc.start();
-    osc.stop(now + 0.1);
-  } else if (type === "explosion") {
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(100, now);
-    osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.3);
-    gainNode.gain.setValueAtTime(0.2, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-    osc.start();
-    osc.stop(now + 0.3);
-  } else if (type === "damage") {
+  if (type === "damage") {
     osc.type = "square";
     osc.frequency.setValueAtTime(150, now);
     osc.frequency.linearRampToValueAtTime(100, now + 0.1);

@@ -42,91 +42,98 @@
   --color-sidebar-ring: var(--sidebar-ring);
   
   /* Custom Fonts */
-  --font-display: "Fredoka One", cursive;
-  --font-body: "Quicksand", sans-serif;
+  --font-display: "Yuji Syuku", serif; /* Japanese Calligraphy Style */
+  --font-body: "Zen Maru Gothic", sans-serif; /* Rounded Japanese Font */
   --font-pixel: "VT323", monospace;
 }
 
 :root {
-  /* Kawaii Pop Art Palette */
-  --primary: oklch(0.75 0.25 340); /* Hot Pink */
-  --primary-foreground: oklch(1 0 0); /* White */
+  /* Traditional Japanese Palette (Wa-Iro) */
   
-  --secondary: oklch(0.85 0.15 200); /* Sky Blue */
-  --secondary-foreground: oklch(0.3 0.1 260); /* Deep Blue */
+  /* Enji (Deep Red) - Primary Action Color */
+  --primary: oklch(0.45 0.18 20); 
+  --primary-foreground: oklch(0.98 0.02 85); /* Off-white */
   
-  --accent: oklch(0.9 0.15 95); /* Sunny Yellow */
-  --accent-foreground: oklch(0.4 0.1 30); /* Brown */
+  /* Ai (Indigo) - Secondary/Background Elements */
+  --secondary: oklch(0.35 0.12 250); 
+  --secondary-foreground: oklch(0.95 0.02 85);
   
-  --background: oklch(0.98 0.02 330); /* Very Light Pink */
-  --foreground: oklch(0.3 0.1 330); /* Dark Pink/Purple */
+  /* Yamabuki (Golden Yellow) - Accents/Highlights */
+  --accent: oklch(0.85 0.18 85); 
+  --accent-foreground: oklch(0.25 0.1 30); /* Dark Brown */
   
-  --card: oklch(1 0 0 / 0.8);
-  --card-foreground: oklch(0.3 0.1 330);
+  /* Matcha/Uguisu (Muted Green) - Backgrounds */
+  --background: oklch(0.95 0.03 110); /* Very Light Matcha */
+  --foreground: oklch(0.25 0.05 30); /* Sumi Ink Black */
   
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.3 0.1 330);
+  /* Washi Paper White for Cards */
+  --card: oklch(0.98 0.01 85 / 0.9);
+  --card-foreground: oklch(0.25 0.05 30);
   
-  --muted: oklch(0.95 0.05 330);
-  --muted-foreground: oklch(0.6 0.1 330);
+  --popover: oklch(0.98 0.01 85);
+  --popover-foreground: oklch(0.25 0.05 30);
   
-  --destructive: oklch(0.6 0.2 20);
+  --muted: oklch(0.9 0.05 110);
+  --muted-foreground: oklch(0.4 0.05 110);
+  
+  /* Akabeni (Bright Red) - Destructive/Alerts */
+  --destructive: oklch(0.55 0.22 25);
   --destructive-foreground: oklch(1 0 0);
   
-  --border: oklch(0.9 0.05 330);
-  --input: oklch(0.95 0.02 330);
-  --ring: oklch(0.75 0.25 340);
+  --border: oklch(0.85 0.05 30); /* Light Ink */
+  --input: oklch(0.95 0.02 85);
+  --ring: oklch(0.45 0.18 20); /* Enji Ring */
   
-  --radius: 1.5rem; /* Very rounded */
+  --radius: 0.5rem; /* Slightly rounded, more traditional */
   
-  --sidebar: oklch(0.98 0.02 330);
-  --sidebar-foreground: oklch(0.3 0.1 330);
-  --sidebar-primary: oklch(0.75 0.25 340);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.9 0.15 95);
-  --sidebar-accent-foreground: oklch(0.4 0.1 30);
-  --sidebar-border: oklch(0.9 0.05 330);
-  --sidebar-ring: oklch(0.75 0.25 340);
+  --sidebar: oklch(0.95 0.03 110);
+  --sidebar-foreground: oklch(0.25 0.05 30);
+  --sidebar-primary: oklch(0.45 0.18 20);
+  --sidebar-primary-foreground: oklch(0.98 0.02 85);
+  --sidebar-accent: oklch(0.85 0.18 85);
+  --sidebar-accent-foreground: oklch(0.25 0.1 30);
+  --sidebar-border: oklch(0.85 0.05 30);
+  --sidebar-ring: oklch(0.45 0.18 20);
 }
 
 .dark {
-  /* Dark mode is just a slightly darker version, still colorful */
-  --background: oklch(0.2 0.1 280); /* Deep Purple */
-  --foreground: oklch(0.95 0.05 330); /* Light Pink */
+  /* Dark Mode - Night Festival Theme */
+  --background: oklch(0.15 0.05 260); /* Dark Indigo Night */
+  --foreground: oklch(0.95 0.02 85);
   
-  --card: oklch(0.25 0.1 280 / 0.8);
-  --card-foreground: oklch(0.95 0.05 330);
+  --card: oklch(0.2 0.05 260 / 0.9);
+  --card-foreground: oklch(0.95 0.02 85);
   
-  --popover: oklch(0.25 0.1 280);
-  --popover-foreground: oklch(0.95 0.05 330);
+  --popover: oklch(0.2 0.05 260);
+  --popover-foreground: oklch(0.95 0.02 85);
   
-  --primary: oklch(0.7 0.25 340);
+  --primary: oklch(0.55 0.2 25); /* Brighter Red for contrast */
   --primary-foreground: oklch(1 0 0);
   
-  --secondary: oklch(0.4 0.15 260);
+  --secondary: oklch(0.3 0.1 250);
   --secondary-foreground: oklch(0.9 0.05 200);
   
-  --muted: oklch(0.3 0.1 280);
-  --muted-foreground: oklch(0.7 0.05 280);
+  --muted: oklch(0.25 0.05 260);
+  --muted-foreground: oklch(0.7 0.05 260);
   
-  --accent: oklch(0.8 0.2 95);
+  --accent: oklch(0.85 0.18 85); /* Golden Yellow remains */
   --accent-foreground: oklch(0.2 0.1 30);
   
-  --destructive: oklch(0.6 0.2 20);
+  --destructive: oklch(0.6 0.22 25);
   --destructive-foreground: oklch(1 0 0);
   
-  --border: oklch(0.4 0.1 280);
-  --input: oklch(0.3 0.1 280);
-  --ring: oklch(0.7 0.25 340);
+  --border: oklch(0.3 0.05 260);
+  --input: oklch(0.25 0.05 260);
+  --ring: oklch(0.55 0.2 25);
   
-  --sidebar: oklch(0.2 0.1 280);
-  --sidebar-foreground: oklch(0.95 0.05 330);
-  --sidebar-primary: oklch(0.7 0.25 340);
+  --sidebar: oklch(0.15 0.05 260);
+  --sidebar-foreground: oklch(0.95 0.02 85);
+  --sidebar-primary: oklch(0.55 0.2 25);
   --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.8 0.2 95);
+  --sidebar-accent: oklch(0.85 0.18 85);
   --sidebar-accent-foreground: oklch(0.2 0.1 30);
-  --sidebar-border: oklch(0.4 0.1 280);
-  --sidebar-ring: oklch(0.7 0.25 340);
+  --sidebar-border: oklch(0.3 0.05 260);
+  --sidebar-ring: oklch(0.55 0.2 25);
 }
 
 @layer base {
@@ -181,16 +188,17 @@
     }
   }
   
-  /* Custom Kawaii Classes */
-  .kawaii-border {
-    @apply border-4 border-white shadow-[0_4px_0_rgba(0,0,0,0.1)] rounded-3xl;
+  /* Custom Japanese Style Classes */
+  .japanese-border {
+    @apply border-4 border-primary/80 shadow-[0_4px_0_rgba(0,0,0,0.2)] rounded-lg;
+    background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23f0f0f0' fill-opacity='0.1' fill-rule='evenodd'%3E%3Ccircle cx='3' cy='3' r='3'/%3E%3Ccircle cx='13' cy='13' r='3'/%3E%3C/g%3E%3C/svg%3E");
   }
   
-  .kawaii-text-shadow {
-    text-shadow: 2px 2px 0px rgba(0,0,0,0.1);
+  .japanese-text-shadow {
+    text-shadow: 2px 2px 0px rgba(0,0,0,0.2);
   }
   
-  .kawaii-button {
-    @apply transition-transform active:scale-95 hover:scale-105 font-display tracking-wide;
+  .japanese-button {
+    @apply transition-transform active:scale-95 hover:scale-105 font-display tracking-widest border-2 border-primary/50 shadow-md;
   }
 }
