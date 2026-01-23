@@ -25,8 +25,18 @@ type Entity = {
 
 // --- Assets ---
 const ASSETS = {
+  // New Player Assets
+  playerCenterClosed: "/images/player_center_closed.png",
+  playerCenterOpen: "/images/player_center_open.png",
+  playerLeftClosed: "/images/player_left_closed.png",
+  playerLeftOpen: "/images/player_left_open.png",
+  playerRightClosed: "/images/player_right_closed.png",
+  playerRightOpen: "/images/player_right_open.png",
+  
+  // Legacy/Fallback
   cursor: "/images/player_closed.png",
-  cursorOpen: "/images/player_open.png", // Try standard open image first
+  cursorOpen: "/images/player_open.png",
+  
   missile: "/images/projectile_voice.png",
   enemy1: "/images/enemy_1.png", // Keep old ones as fallback or mix
   enemy2: "/images/enemy_2.png",
@@ -126,6 +136,8 @@ export default function GameCanvas() {
   
   // Refs for game loop logic
   const cursorPosRef = useRef<Point>({ x: 0.5, y: 0.5 });
+  const prevCursorXRef = useRef(window.innerWidth / 2); // To calculate movement direction
+  const leanRef = useRef<"center" | "left" | "right">("center");
   const entitiesRef = useRef<Entity[]>([]);
   const frameCountRef = useRef(0);
   const mouthCooldownRef = useRef(0);
@@ -637,13 +649,42 @@ export default function GameCanvas() {
 
      // Player Character (Cursor)
     const isMobile = width < 600;
-    // Make open mouth cursor significantly larger
-    const baseSize = isMobile ? 60 : 80;
-    // Use Ref for immediate update in draw loop
-    const isMouthOpenNow = isMouthOpenRef.current;
-    const cursorSize = isMouthOpenNow ? baseSize * 1.5 : baseSize; 
-    const playerImg = isMouthOpenNow ? imagesRef.current.cursorOpen : imagesRef.current.cursor;
+    const baseSize = isMobile ? 80 : 100; // Slightly larger for new character
     
+    // Calculate Lean based on movement
+    const dx = cursorPosRef.current.x - (prevCursorXRef.current * width); // This logic needs fix, prevCursorXRef should store pixel or normalized? 
+    // Let's use normalized for consistency
+    const currentX = cursorPosRef.current.x;
+    const prevX = prevCursorXRef.current;
+    const diffX = currentX - prevX; // Pixel difference
+    
+    // Update lean ref
+    if (diffX < -2) leanRef.current = "left";
+    else if (diffX > 2) leanRef.current = "right";
+    else leanRef.current = "center";
+    
+    prevCursorXRef.current = currentX; // Update for next frame
+
+    // Select Image based on Lean and Mouth
+    const isMouthOpenNow = isMouthOpenRef.current;
+    const lean = leanRef.current;
+    
+    let playerImg;
+    if (lean === "left") {
+        playerImg = isMouthOpenNow ? imagesRef.current.playerLeftOpen : imagesRef.current.playerLeftClosed;
+    } else if (lean === "right") {
+        playerImg = isMouthOpenNow ? imagesRef.current.playerRightOpen : imagesRef.current.playerRightClosed;
+    } else {
+        playerImg = isMouthOpenNow ? imagesRef.current.playerCenterOpen : imagesRef.current.playerCenterClosed;
+    }
+    
+    // Fallback to old assets if new ones missing
+    if (!playerImg) {
+         playerImg = isMouthOpenNow ? imagesRef.current.cursorOpen : imagesRef.current.cursor;
+    }
+
+    const cursorSize = isMouthOpenNow ? baseSize * 1.2 : baseSize; // Less dramatic size change for full body
+
     // Draw Aura if mouth is open
     if (isMouthOpenNow) {
         ctx.beginPath();
