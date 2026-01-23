@@ -498,21 +498,28 @@ export default function GameCanvas() {
     if (damageEffectRef.current > 0) damageEffectRef.current--;
 
     // --- Leveling System ---
-    const targetLevel = Math.floor(scoreRef.current / 500) + 1;
+    // Boss spawns when score reaches threshold for next level
+    // After boss is defeated, normal enemies continue until next boss threshold
+    const scoreForNextBoss = difficultyRef.current * 500; // Boss at 500, 1000, 1500, etc.
     
-    if (targetLevel > difficultyRef.current && !bossActiveRef.current && bossSpawnedForLevelRef.current < targetLevel) {
+    // Spawn boss only when:
+    // 1. Score reaches the threshold for current difficulty level
+    // 2. No boss is currently active
+    // 3. Boss hasn't been spawned for this level yet
+    if (scoreRef.current >= scoreForNextBoss && !bossActiveRef.current && bossSpawnedForLevelRef.current < difficultyRef.current) {
       spawnEnemy(width, height, 1.0, true);
       bossActiveRef.current = true;
-      bossSpawnedForLevelRef.current = targetLevel;
+      bossSpawnedForLevelRef.current = difficultyRef.current;
       setShowBossWarning(true);
       setTimeout(() => setShowBossWarning(false), 3000);
       playSound("gameover");
     }
 
+    // Difficulty increases spawn rate and enemy speed
     const currentSpawnRate = Math.max(20, SPAWN_RATE - (difficultyRef.current * 5));
-    const speedMultiplier = 1 + (difficultyRef.current * 0.1);
+    const speedMultiplier = 1 + (difficultyRef.current * 0.15);
 
-    // Spawn Enemies (Only if boss is NOT active)
+    // Spawn normal enemies when boss is NOT active
     if (!bossActiveRef.current && frameCountRef.current % currentSpawnRate === 0) {
       spawnEnemy(width, height, speedMultiplier, false);
     }
@@ -594,7 +601,8 @@ export default function GameCanvas() {
           
           if (e.isBoss) {
             bossActiveRef.current = false;
-            bossSpawnedForLevelRef.current = targetLevel - 1;
+            // Allow boss to respawn if it escaped
+            bossSpawnedForLevelRef.current = difficultyRef.current - 1;
           }
         }
         return false;
@@ -650,6 +658,7 @@ export default function GameCanvas() {
             setScore(scoreRef.current);
             
             if (e.isBoss) {
+              // Boss defeated - level up and return to normal enemies
               bossActiveRef.current = false;
               const newLevel = difficultyRef.current + 1;
               setDifficulty(newLevel);
@@ -657,7 +666,8 @@ export default function GameCanvas() {
               setShowLevelUp(true);
               setTimeout(() => setShowLevelUp(false), 3000);
               playSound("powerup");
-              bossSpawnedForLevelRef.current = newLevel;
+              // Set bossSpawnedForLevelRef to current level so next boss spawns at newLevel * 500
+              bossSpawnedForLevelRef.current = difficultyRef.current;
             }
           }
         }
@@ -735,12 +745,15 @@ export default function GameCanvas() {
         startY = 0;
       }
       ctx.drawImage(bgImageRef.current, startX, startY, drawW, drawH);
+      // Add light overlay to make background brighter
+      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+      ctx.fillRect(0, 0, width, height);
     } else {
-      // Halloween gradient fallback
+      // Halloween gradient fallback (lighter version)
       const gradient = ctx.createLinearGradient(0, 0, 0, height);
-      gradient.addColorStop(0, "#1a0a2e");
-      gradient.addColorStop(0.5, "#4a1a6b");
-      gradient.addColorStop(1, "#ff6b35");
+      gradient.addColorStop(0, "#5a3d7a");
+      gradient.addColorStop(0.5, "#8b5aab");
+      gradient.addColorStop(1, "#ffb380");
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, width, height);
     }
