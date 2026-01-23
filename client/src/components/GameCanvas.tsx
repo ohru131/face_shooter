@@ -17,6 +17,7 @@ type Entity = {
   vy: number;
   type: "missile" | "enemy" | "particle" | "powerup";
   isBoss?: boolean;
+  isProjectile?: boolean; // Flag to identify enemy projectiles
   maxLife?: number;
   enemyType?: "kappa" | "umbrella" | "lantern" | "gashadokuro" | "ootengu";
   life?: number; // For particles
@@ -461,6 +462,7 @@ export default function GameCanvas() {
                 vx: (dx / dist) * speed,
                 vy: (dy / dist) * speed,
                 type: "enemy", // Treat as enemy for collision with player
+                isProjectile: true, // Mark as projectile so player missiles pass through
                 image: imagesRef.current.enemyFireball, // Use new purple fireball
                 life: 1,
                 maxLife: 1
@@ -562,6 +564,19 @@ export default function GameCanvas() {
     // 1. Missile vs Enemy
     missiles.forEach(m => {
       enemies.forEach(e => {
+        // Skip collision check if the enemy is actually an enemy projectile
+        // Assuming enemy projectiles might be tagged as 'enemy' but we want to ignore them?
+        // Wait, if enemy projectiles are type="enemy", they can be shot down.
+        // The user wants: "敵の出す攻撃オブジェクトは、こちらの火の玉では打ち消すことができず、通過してください"
+        // So we need to distinguish between "Enemy Body" and "Enemy Projectile".
+        // Currently, I suspect enemy projectiles are just spawned as type="enemy" or maybe I need to check where they are spawned.
+        // Let's check spawn logic. If I can't find it, I'll assume I need to add a new type or check a property.
+        // Looking at previous reads, I didn't see explicit enemy projectile spawning.
+        // But if they exist, they must be in entitiesRef.
+        // If they are type="enemy", I should add a flag like `isProjectile: true` to them and check it here.
+        // For now, I will assume any entity with `isProjectile: true` should be ignored by player missiles.
+        if (e.isProjectile) return;
+
         if (
           m.x < e.x + e.width &&
           m.x + m.width > e.x &&
