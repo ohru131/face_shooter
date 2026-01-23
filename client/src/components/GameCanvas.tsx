@@ -44,12 +44,15 @@ const ASSETS = {
   umbrella: "/images/yokai_umbrella.png",
   lantern: "/images/yokai_lantern.png",
   powerup: "/images/item_powerup.png",
-  bg: "/images/game_background.png",
+      bg: "/images/background_jp.png",
   heart: "/images/icon_heart.png",
 };
 
-// --- Audio Context ---
+  // --- Audio Context ---
 const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+const bgmAudio = new Audio("/sounds/bgm_japanese.mp3");
+bgmAudio.loop = true;
+bgmAudio.volume = 0.4;
 
 const playSound = (type: "shoot" | "explosion" | "damage" | "powerup" | "gameover") => {
   if (audioCtx.state === "suspended") {
@@ -128,6 +131,7 @@ export default function GameCanvas() {
   const [sensitivity, setSensitivity] = useState(1.5);
   const [isMouthOpen, setIsMouthOpen] = useState(false);
   const isMouthOpenRef = useRef(false);
+  const wasMouthOpenRef = useRef(false);
   useEffect(() => { isMouthOpenRef.current = isMouthOpen; }, [isMouthOpen]);
   const [difficulty, setDifficulty] = useState(1);
   const difficultyRef = useRef(1);
@@ -188,7 +192,7 @@ export default function GameCanvas() {
       kappa: loadImg(ASSETS.kappa),
       umbrella: loadImg(ASSETS.umbrella),
       lantern: loadImg(ASSETS.lantern),
-      powerup: loadImg(ASSETS.powerup),
+      powerup: loadImg("/images/onigiri.png"), // Use onigiri for powerup
       heart: loadImg(ASSETS.heart),
     };
     
@@ -543,8 +547,12 @@ export default function GameCanvas() {
         startY = 0;
       }
       ctx.drawImage(bgImageRef.current, startX, startY, drawW, drawH);
+      
+      // Add a slight overlay to make it look more "Japanese paper" style if needed, or just darken for contrast
+      ctx.fillStyle = "rgba(255, 250, 240, 0.1)";
+      ctx.fillRect(0, 0, width, height);
     } else {
-      ctx.fillStyle = "#fce7f3";
+      ctx.fillStyle = "#2c3e50"; // Fallback dark blue
       ctx.fillRect(0, 0, width, height);
     }
 
@@ -613,6 +621,7 @@ export default function GameCanvas() {
         restartGame(); // Ensure fresh start
         setGameState("playing");
         setIsFaceMissing(false);
+        bgmAudio.play().catch(e => console.log("Audio play failed:", e));
       } else if (isFaceMissingRef.current) {
         // If face was missing (in any state: playing, gameover, start), and now detected:
         // "戻ると最初からゲーム開始" -> Always restart
@@ -624,15 +633,12 @@ export default function GameCanvas() {
         }, 0);
       }
       
-      // Shoot
-      if (isOpen && mouthCooldownRef.current <= 0 && gameStateRef.current === "playing") {
+      // Shoot (Semi-auto: Only on Close -> Open transition)
+      if (isOpen && !wasMouthOpenRef.current && gameStateRef.current === "playing") {
         spawnMissile(visualX, visualY);
-        mouthCooldownRef.current = MOUTH_COOLDOWN;
+        playSound("shoot");
       }
-      
-      if (mouthCooldownRef.current > 0) {
-        mouthCooldownRef.current--;
-      }
+      wasMouthOpenRef.current = isOpen;
 
     } else {
       faceDetectedRef.current = false;
@@ -660,14 +666,14 @@ export default function GameCanvas() {
     const baseSize = isMobile ? 80 : 100; // Slightly larger for new character
     
     // Calculate Lean based on movement
-    const dx = cursorPosRef.current.x - (prevCursorXRef.current * width); // This logic needs fix, prevCursorXRef should store pixel or normalized? 
-    // Let's use normalized for consistency
     const currentX = cursorPosRef.current.x;
     const prevX = prevCursorXRef.current;
     const diffX = currentX - prevX; // Pixel difference
     
-    // Update lean ref
-    if (diffX < -2) leanRef.current = "left";
+    // Update lean ref (Inverted as requested: "キャラの右移動と左移動 逆にして")
+    // If moving RIGHT (diffX > 0), lean RIGHT (previously left)
+    // If moving LEFT (diffX < 0), lean LEFT (previously right)
+    if (diffX < -2) leanRef.current = "left"; 
     else if (diffX > 2) leanRef.current = "right";
     else leanRef.current = "center";
     
