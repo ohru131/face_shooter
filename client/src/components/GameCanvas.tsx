@@ -410,6 +410,7 @@ export default function GameCanvas() {
           
           m.y = -999; // Remove missile
           e.y = height + 999; // Remove enemy
+          e.life = 0; // Mark as dead explicitly to avoid player collision
           
           scoreRef.current += 100;
           setScore(scoreRef.current);
@@ -419,7 +420,8 @@ export default function GameCanvas() {
 
     // 2. Player vs Enemy (Collision)
     enemies.forEach(e => {
-      if (e.y > height + 100) return; // Skip already dead enemies (killed by missile)
+      if ((e.life ?? 0) <= 0) return; // Skip dead enemies (killed by missile)
+      if (e.y > height + 100) return; // Skip out of bounds enemies
 
       if (
         playerHitbox.x < e.x + e.width &&
@@ -430,6 +432,7 @@ export default function GameCanvas() {
         spawnExplosion(e.x + e.width/2, e.y + e.height/2, "red");
         takeDamage();
         e.y = height + 999; // Remove enemy
+        e.life = 0; // Mark as dead
       }
     });
 
@@ -552,17 +555,13 @@ export default function GameCanvas() {
 
       // Auto Start & Resume Logic
       if (gameStateRef.current === "start") {
+        // Initial start
+        restartGame(); // Ensure fresh start
         setGameState("playing");
         setIsFaceMissing(false);
-      } else if (gameStateRef.current === "playing" && isFaceMissing) {
-        // If face comes back during playing (after being missing), we restart the game from scratch
-        // User said: "戻ると最初からゲーム開始"
-        restartGame();
-        setGameState("playing");
-        setIsFaceMissing(false);
-      } else if (gameStateRef.current === "gameover" && isFaceMissing) {
-        // If face comes back after gameover (and being missing), restart game
-        // User said: "ゲームオーバーになっても、顔がはずれて、戻るとゲーム開始にしてください"
+      } else if (isFaceMissing) {
+        // If face was missing (in any state: playing, gameover, start), and now detected:
+        // "戻ると最初からゲーム開始" -> Always restart
         restartGame();
         setGameState("playing");
         setIsFaceMissing(false);
