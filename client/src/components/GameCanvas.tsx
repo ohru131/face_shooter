@@ -249,6 +249,7 @@ export default function GameCanvas() {
       type: "enemy",
       enemyType: type,
       image: img,
+      life: 1, // Initialize life to 1 so it's not treated as dead
     });
   };
 
