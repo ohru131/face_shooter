@@ -26,51 +26,57 @@ type Entity = {
   scale?: number;
 };
 
+// --- Base URL for assets (handles GitHub Pages subpath) ---
+const BASE_URL = import.meta.env.BASE_URL || '/';
+
+// Helper function to resolve asset paths
+const assetPath = (path: string) => `${BASE_URL}${path}`.replace(/\/\//g, '/');
+
 // --- Assets (Halloween Theme) ---
 const ASSETS = {
   // Player Assets (Witch)
-  playerCenterClosed: "/images/player_center_closed.png",
-  playerCenterOpen: "/images/player_center_open.png",
-  playerLeftClosed: "/images/player_left_closed.png",
-  playerLeftOpen: "/images/player_left_open.png",
-  playerRightClosed: "/images/player_right_closed.png",
-  playerRightOpen: "/images/player_right_open.png",
+  playerCenterClosed: assetPath("images/player_center_closed.png"),
+  playerCenterOpen: assetPath("images/player_center_open.png"),
+  playerLeftClosed: assetPath("images/player_left_closed.png"),
+  playerLeftOpen: assetPath("images/player_left_open.png"),
+  playerRightClosed: assetPath("images/player_right_closed.png"),
+  playerRightOpen: assetPath("images/player_right_open.png"),
   
   // Legacy/Fallback
-  cursor: "/images/player_closed.png",
-  cursorOpen: "/images/player_open.png",
+  cursor: assetPath("images/player_closed.png"),
+  cursorOpen: assetPath("images/player_open.png"),
   
   // Projectile (Magic Star)
-  missile: "/images/projectile_voice.png",
-  enemyFireball: "/images/enemy_fireball.png",
+  missile: assetPath("images/projectile_voice.png"),
+  enemyFireball: assetPath("images/enemy_fireball.png"),
   
   // Enemies (Halloween Monsters)
-  vampire: "/images/yokai_vampire.png",
-  werewolf: "/images/yokai_werewolf.png",
-  mummy: "/images/yokai_mummy.png",
-  frankenstein: "/images/yokai_frankenstein.png",
+  vampire: assetPath("images/yokai_vampire.png"),
+  werewolf: assetPath("images/yokai_werewolf.png"),
+  mummy: assetPath("images/yokai_mummy.png"),
+  frankenstein: assetPath("images/yokai_frankenstein.png"),
   // Boss enemies (reuse existing images as bosses)
-  reaper: "/images/yokai_mummy.png", // Larger mummy as boss
-  demon: "/images/yokai_frankenstein.png", // Larger frankenstein as boss
+  reaper: assetPath("images/yokai_mummy.png"), // Larger mummy as boss
+  demon: assetPath("images/yokai_frankenstein.png"), // Larger frankenstein as boss
   
   // Powerup (Pumpkin)
-  powerup: "/images/item_powerup.png",
+  powerup: assetPath("images/item_powerup.png"),
   
   // Background (Halloween Night)
-  bg: "/images/game_background.png",
+  bg: assetPath("images/game_background.png"),
   
   // UI
-  heart: "/images/icon_heart_halloween.png",
+  heart: assetPath("images/icon_heart_halloween.png"),
 };
 
 // --- Audio Files ---
 const AUDIO_FILES = {
-  bgm: "/audio/bgm_halloween.wav",
-  shoot: "/audio/sfx_shoot.wav",
-  explosion: "/audio/sfx_explosion.wav",
-  damage: "/audio/sfx_damage.wav",
-  powerup: "/audio/sfx_powerup.wav",
-  gameover: "/audio/sfx_gameover.wav",
+  bgm: assetPath("audio/bgm_halloween.wav"),
+  shoot: assetPath("audio/sfx_shoot.wav"),
+  explosion: assetPath("audio/sfx_explosion.wav"),
+  damage: assetPath("audio/sfx_damage.wav"),
+  powerup: assetPath("audio/sfx_powerup.wav"),
+  gameover: assetPath("audio/sfx_gameover.wav"),
 };
 
 // --- Audio Context ---
