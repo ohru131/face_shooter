@@ -341,7 +341,8 @@ export default function GameCanvas() {
 
   const spawnMissile = (x: number, y: number) => {
     const isMobile = windowSize.width < 600;
-    const size = isMobile ? 30 : 40;
+    // Missile size scaled up (base was 30/40, now 60/80)
+    const size = isMobile ? 60 : 80;
 
     const createMissile = (offsetX: number, angle: number) => {
       entitiesRef.current.push({
@@ -806,11 +807,20 @@ export default function GameCanvas() {
     const prevX = prevCursorXRef.current;
     const diffX = currentX - prevX; // Pixel difference
     
-    // Update lean ref (Inverted as requested: "キャラの右移動と左移動 逆にして")
-    // If moving RIGHT (diffX > 0), lean RIGHT (previously left)
-    // If moving LEFT (diffX < 0), lean LEFT (previously right)
-    if (diffX < -2) leanRef.current = "left"; 
-    else if (diffX > 2) leanRef.current = "right";
+    // Update lean ref (Re-inverted as requested: "動きに応じたキャラを右と左 逆にしてください")
+    // If moving RIGHT (diffX > 0), lean LEFT (face direction of movement)
+    // If moving LEFT (diffX < 0), lean RIGHT (face direction of movement)
+    // Note: "left" image looks left, "right" image looks right.
+    // If we move right (positive diffX), we want to look right.
+    // Wait, the user said "左右の動きとキャラの向きが逆になっている".
+    // Previous logic: diffX > 0 (Right Move) -> lean "right" (Image Right).
+    // If that was "reversed", maybe the images are named counter-intuitively or I misunderstood.
+    // Let's swap them.
+    // New Logic:
+    // Move Right (diffX > 0) -> lean "left" (Image Left)
+    // Move Left (diffX < 0) -> lean "right" (Image Right)
+    if (diffX < -2) leanRef.current = "right"; 
+    else if (diffX > 2) leanRef.current = "left";
     else leanRef.current = "center";
     
     prevCursorXRef.current = currentX; // Update for next frame
