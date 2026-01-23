@@ -172,6 +172,14 @@ export default function GameCanvas() {
     };
     
     imagesRef.current = {
+      // New Player Assets
+      playerCenterClosed: loadImg(ASSETS.playerCenterClosed),
+      playerCenterOpen: loadImg(ASSETS.playerCenterOpen),
+      playerLeftClosed: loadImg(ASSETS.playerLeftClosed),
+      playerLeftOpen: loadImg(ASSETS.playerLeftOpen),
+      playerRightClosed: loadImg(ASSETS.playerRightClosed),
+      playerRightOpen: loadImg(ASSETS.playerRightOpen),
+
       cursor: loadImg(ASSETS.cursor),
       cursorOpen: loadImg(ASSETS.cursorOpen),
       missile: loadImg(ASSETS.missile),
