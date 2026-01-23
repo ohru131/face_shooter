@@ -45,7 +45,7 @@ const ASSETS = {
   lantern: "/images/yokai_lantern.png",
   powerup: "/images/onigiri.png",
       bg: "/images/background_jp.png",
-  heart: "/images/icon_heart.png",
+  heart: "/images/icon_sakura.png",
 };
 
   // --- Audio Context ---
@@ -547,7 +547,7 @@ export default function GameCanvas() {
       ctx.drawImage(bgImageRef.current, startX, startY, drawW, drawH);
       
       // Add a slight overlay to make it look more "Japanese paper" style if needed, or just darken for contrast
-      ctx.fillStyle = "rgba(255, 250, 240, 0.1)";
+      ctx.fillStyle = "rgba(255, 250, 240, 0.7)";
       ctx.fillRect(0, 0, width, height);
     } else {
       ctx.fillStyle = "#2c3e50"; // Fallback dark blue
