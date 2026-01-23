@@ -260,7 +260,7 @@ export default function GameCanvas() {
         isBoss = true;
         size *= 3;
         life = 5; // Boss HP increased to 5
-        speed *= 0.3; // Boss moves very slow
+        speed = ENEMY_SPEED_BASE * 0.8; // Boss moves at decent speed (not too slow)
         type = "lantern"; // Boss appearance
         img = imagesRef.current.lantern; // Placeholder, ideally specific boss image
     }
@@ -280,7 +280,7 @@ export default function GameCanvas() {
     }
 
     const x = Math.random() * (width - size);
-    const y = -size; 
+    const y = isBoss ? -size * 0.5 : -size; // Boss spawns closer to visible area
     
     entitiesRef.current.push({
       id: Math.random(),
