@@ -16,16 +16,16 @@ type Entity = {
   vx: number;
   vy: number;
   type: "missile" | "enemy" | "particle" | "powerup";
-  enemyType?: "kappa" | "umbrella" | "lantern";
+  enemyType?: "vampire" | "werewolf" | "mummy" | "frankenstein";
   life?: number; // For particles
   image?: HTMLImageElement;
   rotation?: number;
   scale?: number;
 };
 
-// --- Assets ---
+// --- Assets (Halloween Theme) ---
 const ASSETS = {
-  // New Player Assets
+  // Player Assets (Witch)
   playerCenterClosed: "/images/player_center_closed.png",
   playerCenterOpen: "/images/player_center_open.png",
   playerLeftClosed: "/images/player_left_closed.png",
@@ -37,72 +37,154 @@ const ASSETS = {
   cursor: "/images/player_closed.png",
   cursorOpen: "/images/player_open.png",
   
+  // Projectile (Magic Star)
   missile: "/images/projectile_voice.png",
-  enemy1: "/images/enemy_1.png", // Keep old ones as fallback or mix
-  enemy2: "/images/enemy_2.png",
-  kappa: "/images/yokai_kappa.png",
-  umbrella: "/images/yokai_umbrella.png",
-  lantern: "/images/yokai_lantern.png",
+  
+  // Enemies (Halloween Monsters)
+  vampire: "/images/yokai_vampire.png",
+  werewolf: "/images/yokai_werewolf.png",
+  mummy: "/images/yokai_mummy.png",
+  frankenstein: "/images/yokai_frankenstein.png",
+  
+  // Powerup (Pumpkin)
   powerup: "/images/item_powerup.png",
+  
+  // Background (Halloween Night)
   bg: "/images/game_background.png",
-  heart: "/images/icon_heart.png",
+  
+  // UI
+  heart: "/images/icon_heart_halloween.png",
+};
+
+// --- Audio Files ---
+const AUDIO_FILES = {
+  bgm: "/audio/bgm_halloween.wav",
+  shoot: "/audio/sfx_shoot.wav",
+  explosion: "/audio/sfx_explosion.wav",
+  damage: "/audio/sfx_damage.wav",
+  powerup: "/audio/sfx_powerup.wav",
+  gameover: "/audio/sfx_gameover.wav",
 };
 
 // --- Audio Context ---
 const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+const audioBuffers: Record<string, AudioBuffer> = {};
+let bgmSource: AudioBufferSourceNode | null = null;
+let bgmGainNode: GainNode | null = null;
+
+// Load audio files
+const loadAudioFile = async (name: string, url: string) => {
+  try {
+    const response = await fetch(url);
+    const arrayBuffer = await response.arrayBuffer();
+    audioBuffers[name] = await audioCtx.decodeAudioData(arrayBuffer);
+  } catch (e) {
+    console.warn(`Failed to load audio: ${name}`, e);
+  }
+};
+
+// Initialize audio
+const initAudio = async () => {
+  await loadAudioFile("shoot", AUDIO_FILES.shoot);
+  await loadAudioFile("explosion", AUDIO_FILES.explosion);
+  await loadAudioFile("damage", AUDIO_FILES.damage);
+  await loadAudioFile("powerup", AUDIO_FILES.powerup);
+  await loadAudioFile("gameover", AUDIO_FILES.gameover);
+  await loadAudioFile("bgm", AUDIO_FILES.bgm);
+};
 
 const playSound = (type: "shoot" | "explosion" | "damage" | "powerup" | "gameover") => {
   if (audioCtx.state === "suspended") {
     audioCtx.resume();
   }
-  const osc = audioCtx.createOscillator();
-  const gainNode = audioCtx.createGain();
+  
+  const buffer = audioBuffers[type];
+  if (buffer) {
+    const source = audioCtx.createBufferSource();
+    const gainNode = audioCtx.createGain();
+    source.buffer = buffer;
+    source.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    gainNode.gain.value = type === "gameover" ? 0.5 : 0.3;
+    source.start();
+  } else {
+    // Fallback to oscillator if audio not loaded
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
 
-  osc.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
+    if (type === "shoot") {
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+      gainNode.gain.setValueAtTime(0.1, now);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+      osc.start();
+      osc.stop(now + 0.1);
+    } else if (type === "explosion") {
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(100, now);
+      osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.3);
+      gainNode.gain.setValueAtTime(0.2, now);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+      osc.start();
+      osc.stop(now + 0.3);
+    } else if (type === "damage") {
+      osc.type = "square";
+      osc.frequency.setValueAtTime(150, now);
+      osc.frequency.linearRampToValueAtTime(100, now + 0.1);
+      gainNode.gain.setValueAtTime(0.2, now);
+      gainNode.gain.linearRampToValueAtTime(0.01, now + 0.2);
+      osc.start();
+      osc.stop(now + 0.2);
+    } else if (type === "powerup") {
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.linearRampToValueAtTime(1200, now + 0.2);
+      gainNode.gain.setValueAtTime(0.1, now);
+      gainNode.gain.linearRampToValueAtTime(0.01, now + 0.4);
+      osc.start();
+      osc.stop(now + 0.4);
+    } else if (type === "gameover") {
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(300, now);
+      osc.frequency.linearRampToValueAtTime(50, now + 1.0);
+      gainNode.gain.setValueAtTime(0.3, now);
+      gainNode.gain.linearRampToValueAtTime(0.01, now + 1.0);
+      osc.start();
+      osc.stop(now + 1.0);
+    }
+  }
+};
 
-  const now = audioCtx.currentTime;
+const startBGM = () => {
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+  
+  if (bgmSource) {
+    bgmSource.stop();
+  }
+  
+  const buffer = audioBuffers["bgm"];
+  if (buffer) {
+    bgmSource = audioCtx.createBufferSource();
+    bgmGainNode = audioCtx.createGain();
+    bgmSource.buffer = buffer;
+    bgmSource.loop = true;
+    bgmSource.connect(bgmGainNode);
+    bgmGainNode.connect(audioCtx.destination);
+    bgmGainNode.gain.value = 0.15;
+    bgmSource.start();
+  }
+};
 
-  if (type === "shoot") {
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(440, now);
-    osc.frequency.exponentialRampToValueAtTime(880, now + 0.1);
-    gainNode.gain.setValueAtTime(0.1, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-    osc.start();
-    osc.stop(now + 0.1);
-  } else if (type === "explosion") {
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(100, now);
-    osc.frequency.exponentialRampToValueAtTime(0.01, now + 0.3);
-    gainNode.gain.setValueAtTime(0.2, now);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-    osc.start();
-    osc.stop(now + 0.3);
-  } else if (type === "damage") {
-    osc.type = "square";
-    osc.frequency.setValueAtTime(150, now);
-    osc.frequency.linearRampToValueAtTime(100, now + 0.1);
-    gainNode.gain.setValueAtTime(0.2, now);
-    gainNode.gain.linearRampToValueAtTime(0.01, now + 0.2);
-    osc.start();
-    osc.stop(now + 0.2);
-  } else if (type === "powerup") {
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(600, now);
-    osc.frequency.linearRampToValueAtTime(1200, now + 0.2);
-    gainNode.gain.setValueAtTime(0.1, now);
-    gainNode.gain.linearRampToValueAtTime(0.01, now + 0.4);
-    osc.start();
-    osc.stop(now + 0.4);
-  } else if (type === "gameover") {
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(300, now);
-    osc.frequency.linearRampToValueAtTime(50, now + 1.0);
-    gainNode.gain.setValueAtTime(0.3, now);
-    gainNode.gain.linearRampToValueAtTime(0.01, now + 1.0);
-    osc.start();
-    osc.stop(now + 1.0);
+const stopBGM = () => {
+  if (bgmSource) {
+    bgmSource.stop();
+    bgmSource = null;
   }
 };
 
@@ -136,7 +218,7 @@ export default function GameCanvas() {
   
   // Refs for game loop logic
   const cursorPosRef = useRef<Point>({ x: 0.5, y: 0.5 });
-  const prevCursorXRef = useRef(window.innerWidth / 2); // To calculate movement direction
+  const prevCursorXRef = useRef(window.innerWidth / 2);
   const leanRef = useRef<"center" | "left" | "right">("center");
   const entitiesRef = useRef<Entity[]>([]);
   const frameCountRef = useRef(0);
@@ -146,7 +228,7 @@ export default function GameCanvas() {
   const imagesRef = useRef<Record<string, HTMLImageElement>>({});
   const bgImageRef = useRef<HTMLImageElement | null>(null);
   const faceDetectedRef = useRef(false);
-  const damageEffectRef = useRef(0); // Frames to show damage effect
+  const damageEffectRef = useRef(0);
 
   // Handle Resize
   useEffect(() => {
@@ -158,12 +240,12 @@ export default function GameCanvas() {
     };
     
     window.addEventListener('resize', handleResize);
-    handleResize(); // Init
+    handleResize();
     
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Load images on mount
+  // Load images and audio on mount
   useEffect(() => {
     const loadImg = (src: string) => {
       const img = new Image();
@@ -172,7 +254,7 @@ export default function GameCanvas() {
     };
     
     imagesRef.current = {
-      // New Player Assets
+      // Player Assets (Witch)
       playerCenterClosed: loadImg(ASSETS.playerCenterClosed),
       playerCenterOpen: loadImg(ASSETS.playerCenterOpen),
       playerLeftClosed: loadImg(ASSETS.playerLeftClosed),
@@ -183,17 +265,22 @@ export default function GameCanvas() {
       cursor: loadImg(ASSETS.cursor),
       cursorOpen: loadImg(ASSETS.cursorOpen),
       missile: loadImg(ASSETS.missile),
-      enemy1: loadImg(ASSETS.enemy1),
-      enemy2: loadImg(ASSETS.enemy2),
-      kappa: loadImg(ASSETS.kappa),
-      umbrella: loadImg(ASSETS.umbrella),
-      lantern: loadImg(ASSETS.lantern),
+      
+      // Halloween Enemies
+      vampire: loadImg(ASSETS.vampire),
+      werewolf: loadImg(ASSETS.werewolf),
+      mummy: loadImg(ASSETS.mummy),
+      frankenstein: loadImg(ASSETS.frankenstein),
+      
       powerup: loadImg(ASSETS.powerup),
       heart: loadImg(ASSETS.heart),
     };
     
     const bg = loadImg(ASSETS.bg);
     bg.onload = () => { bgImageRef.current = bg; };
+
+    // Initialize audio
+    initAudio();
 
   }, []);
 
@@ -227,6 +314,7 @@ export default function GameCanvas() {
 
     return () => {
       faceMesh.close();
+      stopBGM();
     };
   }, []);
 
@@ -238,25 +326,28 @@ export default function GameCanvas() {
 
   const spawnEnemy = (width: number, height: number, speedMultiplier: number = 1.0) => {
     const rand = Math.random();
-    let type: "kappa" | "umbrella" | "lantern" = "kappa";
-    let img = imagesRef.current.kappa;
+    let type: "vampire" | "werewolf" | "mummy" | "frankenstein" = "vampire";
+    let img = imagesRef.current.vampire;
     let speed = ENEMY_SPEED_BASE * speedMultiplier;
-    // Responsive size: smaller on mobile
     const isMobile = width < 600;
     let size = isMobile ? 50 : 70;
 
-    if (rand < 0.33) {
-      type = "kappa";
-      img = imagesRef.current.kappa;
+    if (rand < 0.25) {
+      type = "vampire";
+      img = imagesRef.current.vampire;
       speed = ENEMY_SPEED_BASE * 1.2; // Fast
-    } else if (rand < 0.66) {
-      type = "umbrella";
-      img = imagesRef.current.umbrella;
-      speed = ENEMY_SPEED_BASE * 0.8; // Slow but maybe erratic?
+    } else if (rand < 0.5) {
+      type = "werewolf";
+      img = imagesRef.current.werewolf;
+      speed = ENEMY_SPEED_BASE * 1.0;
+    } else if (rand < 0.75) {
+      type = "mummy";
+      img = imagesRef.current.mummy;
+      speed = ENEMY_SPEED_BASE * 0.8; // Slow
     } else {
-      type = "lantern";
-      img = imagesRef.current.lantern;
-      speed = ENEMY_SPEED_BASE;
+      type = "frankenstein";
+      img = imagesRef.current.frankenstein;
+      speed = ENEMY_SPEED_BASE * 0.9;
     }
 
     const x = Math.random() * (width - size);
@@ -273,7 +364,7 @@ export default function GameCanvas() {
       type: "enemy",
       enemyType: type,
       image: img,
-      life: 1, // Initialize life to 1 so it's not treated as dead
+      life: 1,
     });
   };
 
@@ -329,7 +420,7 @@ export default function GameCanvas() {
     playSound("shoot");
   };
 
-  const spawnExplosion = (x: number, y: number, color: string = "yellow") => {
+  const spawnExplosion = (x: number, y: number, color: string = "purple") => {
     for (let i = 0; i < 10; i++) {
       const angle = (Math.PI * 2 * i) / 10;
       const speed = 5 + Math.random() * 5;
@@ -343,172 +434,123 @@ export default function GameCanvas() {
         vy: Math.sin(angle) * speed,
         type: "particle",
         life: 30,
-        image: undefined, // Use color
+        image: undefined,
       });
-    }
-  };
-
-  const takeDamage = () => {
-    if (livesRef.current > 0) {
-      livesRef.current--;
-      setLives(livesRef.current);
-      damageEffectRef.current = 10; // Show red flash for 10 frames
-      playSound("damage");
-      
-      if (livesRef.current <= 0) {
-        setGameState("gameover");
-        playSound("gameover");
-      }
     }
   };
 
   const updateGameLogic = (width: number, height: number) => {
     if (gameStateRef.current !== "playing") return;
-    if (!faceDetectedRef.current) return; // Pause logic if face is missing
 
     frameCountRef.current++;
-    if (damageEffectRef.current > 0) damageEffectRef.current--;
-
-    // Difficulty Scaling
-    // Increase difficulty every 600 frames (approx 10 seconds)
-    const difficultyLevel = Math.floor(frameCountRef.current / 600);
     
-    // Spawn Rate: Decrease interval as difficulty increases (min 20 frames)
-    const currentSpawnRate = Math.max(20, SPAWN_RATE - (difficultyLevel * 5));
-    
-    // Enemy Speed Multiplier: Increase speed slightly with difficulty
-    const speedMultiplier = 1 + (difficultyLevel * 0.1);
+    // Difficulty scaling
+    const newDifficulty = Math.floor(scoreRef.current / 500) + 1;
+    if (newDifficulty !== difficultyRef.current) {
+      difficultyRef.current = newDifficulty;
+      setDifficulty(newDifficulty);
+    }
+    const speedMultiplier = 1 + (difficultyRef.current - 1) * 0.15;
+    const spawnRateAdjusted = Math.max(20, SPAWN_RATE - (difficultyRef.current - 1) * 5);
 
-    // Spawn Enemies
-    if (frameCountRef.current % currentSpawnRate === 0) {
+    // Spawn enemies
+    if (frameCountRef.current % spawnRateAdjusted === 0) {
       spawnEnemy(width, height, speedMultiplier);
     }
     
-    // Spawn Powerup (Rare)
-    if (frameCountRef.current % (SPAWN_RATE * 10) === 0) {
+    // Spawn powerups occasionally
+    if (frameCountRef.current % (spawnRateAdjusted * 5) === 0 && Math.random() < 0.3) {
       spawnPowerup(width, height);
     }
 
-    // Update Entities
-    entitiesRef.current.forEach(entity => {
-      entity.x += entity.vx;
-      entity.y += entity.vy;
-      
-      if (entity.type === "particle" && entity.life !== undefined) {
-        entity.life--;
-        entity.vy += 0.2; // Gravity
-      }
-    });
-
-    // Remove dead entities
+    // Update entities
     entitiesRef.current = entitiesRef.current.filter(e => {
-      if (e.type === "particle") return (e.life || 0) > 0;
-      
-      // Check bounds
-      if (e.y > height + 50) {
-        // Enemy passed bottom
-        if (e.type === "enemy") {
-          takeDamage();
-          // Effect for passing bottom (e.g. screen shake or bottom flash - handled by takeDamage visual)
-        }
+      // Update position
+      e.x += e.vx;
+      e.y += e.vy;
+
+      // Particles fade
+      if (e.type === "particle") {
+        e.life = (e.life || 0) - 1;
+        if (e.life <= 0) return false;
+      }
+
+      // Remove off-screen
+      if (e.y > height + 100 || e.y < -200 || e.x < -100 || e.x > width + 100) {
         return false;
       }
-      if (e.y < -100 || e.x < -100 || e.x > width + 100) return false;
-      
+
       return true;
     });
 
-    // Collision Detection
-    const missiles = entitiesRef.current.filter(e => e.type === "missile");
-    const enemies = entitiesRef.current.filter(e => e.type === "enemy");
-    const powerups = entitiesRef.current.filter(e => e.type === "powerup");
-    
-    // Player Hitbox (Cursor)
-    const isMobile = width < 600;
-    const hitboxSize = isMobile ? 40 : 60;
-    const playerHitbox = {
-      x: cursorPosRef.current.x - hitboxSize/2,
-      y: cursorPosRef.current.y - hitboxSize/2,
-      width: hitboxSize,
-      height: hitboxSize
-    };
+    // Collision detection
+    const playerX = cursorPosRef.current.x;
+    const playerY = cursorPosRef.current.y;
+    const playerRadius = 40;
 
-    // 1. Missile vs Enemy
-    missiles.forEach(m => {
-      enemies.forEach(e => {
-        if (
-          m.x < e.x + e.width &&
-          m.x + m.width > e.x &&
-          m.y < e.y + e.height &&
-          m.y + m.height > e.y
-        ) {
-          spawnExplosion(e.x + e.width/2, e.y + e.height/2);
-          playSound("explosion");
-          
-          m.y = -999; // Remove missile
-          e.y = height + 999; // Remove enemy
-          e.life = 0; // Mark as dead explicitly
-          e.type = "particle"; // Change type to avoid any further collision checks
-          
-          scoreRef.current += 100;
-          setScore(scoreRef.current);
-        }
-      });
-    });
+    entitiesRef.current.forEach(e => {
+      if (e.type === "enemy") {
+        // Check collision with missiles
+        entitiesRef.current.forEach(m => {
+          if (m.type === "missile") {
+            const dx = (e.x + e.width/2) - (m.x + m.width/2);
+            const dy = (e.y + e.height/2) - (m.y + m.height/2);
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist < (e.width/2 + m.width/2) * 0.8) {
+              // Hit!
+              spawnExplosion(e.x + e.width/2, e.y + e.height/2);
+              playSound("explosion");
+              scoreRef.current += 100;
+              setScore(scoreRef.current);
+              e.y = height + 999; // Remove enemy
+              m.y = -999; // Remove missile
+            }
+          }
+        });
 
-    // 2. Player vs Enemy (Collision)
-    // Re-fetch enemies to ensure we are checking against current state
-    // (Though in this synchronous loop, 'enemies' array from line 388 still holds references to objects)
-    // The issue might be that we are modifying 'e' in the missile loop (changing type to particle)
-    // and then filtering 'enemies' based on type="enemy" at line 388 BEFORE the missile loop runs?
-    // Wait, line 388 runs before missile loop. So 'enemies' array contains all enemies that were enemies at start of frame.
-    // In missile loop (line 402), we change e.type to "particle".
-    // In player loop (line 425), we iterate over the SAME 'enemies' array.
-    // So 'e' inside this loop IS the same object.
-    // We need to check if e.type is still "enemy".
-    
-    enemies.forEach(e => {
-      // Check if enemy is still valid (might have been killed by missile in this same frame)
-      if (e.type !== "enemy") return; 
-      if ((e.life ?? 0) <= 0) return; 
-      if (e.y > height) return; // Skip out of bounds enemies (handled by removal logic)
-
-      if (
-        playerHitbox.x < e.x + e.width &&
-        playerHitbox.x + playerHitbox.width > e.x &&
-        playerHitbox.y < e.y + e.height &&
-        playerHitbox.y + playerHitbox.height > e.y
-      ) {
-        // Collision detected!
-        spawnExplosion(e.x + e.width/2, e.y + e.height/2, "red");
-        takeDamage();
-        
-        // Kill enemy
-        e.y = height + 999; 
-        e.life = 0; 
-        e.type = "particle"; // Prevent double counting
-      }
-    });
-
-    // 3. Player vs Powerup
-    powerups.forEach(p => {
-      if (
-        playerHitbox.x < p.x + p.width &&
-        playerHitbox.x + playerHitbox.width > p.x &&
-        playerHitbox.y < p.y + p.height &&
-        playerHitbox.y + playerHitbox.height > p.y
-      ) {
-        playSound("powerup");
-        setPowerLevel(prev => Math.min(prev + 1, 3));
-        p.y = height + 999; // Remove powerup
-        
-        // Heal one life
-        if (livesRef.current < MAX_LIVES) {
-          livesRef.current++;
+        // Check collision with player
+        const dx = (e.x + e.width/2) - playerX;
+        const dy = (e.y + e.height/2) - playerY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < (e.width/2 + playerRadius) * 0.7) {
+          // Player hit!
+          playSound("damage");
+          livesRef.current--;
           setLives(livesRef.current);
+          damageEffectRef.current = 20;
+          e.y = height + 999; // Remove enemy
+          
+          if (livesRef.current <= 0) {
+            playSound("gameover");
+            stopBGM();
+            setGameState("gameover");
+          }
+        }
+      }
+
+      // Powerup collision
+      if (e.type === "powerup") {
+        const dx = (e.x + e.width/2) - playerX;
+        const dy = (e.y + e.height/2) - playerY;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < (e.width/2 + playerRadius) * 0.8) {
+          playSound("powerup");
+          setPowerLevel(prev => Math.min(prev + 1, 3));
+          e.y = height + 999;
+          
+          // Heal one life
+          if (livesRef.current < MAX_LIVES) {
+            livesRef.current++;
+            setLives(livesRef.current);
+          }
         }
       }
     });
+
+    // Decrease damage effect
+    if (damageEffectRef.current > 0) {
+      damageEffectRef.current--;
+    }
   };
 
   const onResults = (results: Results) => {
@@ -526,7 +568,6 @@ export default function GameCanvas() {
     
     // Draw Background
     if (bgImageRef.current) {
-      // Cover logic for background
       const bgRatio = bgImageRef.current.width / bgImageRef.current.height;
       const canvasRatio = width / height;
       let drawW, drawH, startX, startY;
@@ -544,13 +585,18 @@ export default function GameCanvas() {
       }
       ctx.drawImage(bgImageRef.current, startX, startY, drawW, drawH);
     } else {
-      ctx.fillStyle = "#fce7f3";
+      // Halloween gradient fallback
+      const gradient = ctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, "#1a0a2e");
+      gradient.addColorStop(0.5, "#4a1a6b");
+      gradient.addColorStop(1, "#ff6b35");
+      ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, width, height);
     }
 
-    // Damage Effect (Red Flash)
+    // Damage Effect (Purple Flash for Halloween)
     if (damageEffectRef.current > 0) {
-      ctx.fillStyle = `rgba(255, 0, 0, ${damageEffectRef.current / 20})`;
+      ctx.fillStyle = `rgba(128, 0, 128, ${damageEffectRef.current / 20})`;
       ctx.fillRect(0, 0, width, height);
     }
 
@@ -558,22 +604,14 @@ export default function GameCanvas() {
     ctx.save();
     ctx.translate(width, 0);
     ctx.scale(-1, 1);
-    ctx.globalAlpha = 0.2;
-    
-    // Draw video to cover canvas
-    const video = results.image as unknown as CanvasImageSource; // Cast to CanvasImageSource
-    // Note: results.image is GpuBuffer or ImageBitmap. 
-    // We can just draw it. But we want to maintain aspect ratio or cover.
-    // Webcam is usually 16:9. Canvas matches window.
-    // Let's just stretch for now or simple cover.
+    ctx.globalAlpha = 0.15;
     ctx.drawImage(results.image, 0, 0, width, height);
-    
     ctx.globalAlpha = 1.0;
     
     if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
       faceDetectedRef.current = true;
       const landmarks = results.multiFaceLandmarks[0];
-      drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, { color: '#FFFFFF40', lineWidth: 1 });
+      drawConnectors(ctx, landmarks, FACEMESH_TESSELATION, { color: '#9333ea40', lineWidth: 1 });
       
       // --- Control Logic ---
       const nose = landmarks[1];
@@ -609,18 +647,16 @@ export default function GameCanvas() {
 
       // Auto Start & Resume Logic
       if (gameStateRef.current === "start") {
-        // Initial start
-        restartGame(); // Ensure fresh start
+        restartGame();
         setGameState("playing");
         setIsFaceMissing(false);
+        startBGM();
       } else if (isFaceMissingRef.current) {
-        // If face was missing (in any state: playing, gameover, start), and now detected:
-        // "戻ると最初からゲーム開始" -> Always restart
         restartGame();
-        // Force state update immediately after restart
         setTimeout(() => {
             setGameState("playing");
             setIsFaceMissing(false);
+            startBGM();
         }, 0);
       }
       
@@ -637,16 +673,10 @@ export default function GameCanvas() {
     } else {
       faceDetectedRef.current = false;
       
-      // Face Missing Logic
       if (gameStateRef.current === "playing") {
-        // User said: "顔が外れるとゲーム終了"
-        // So we set state to gameover or just reset to start?
-        // "戻ると最初からゲーム開始" implies we should go to a state where we wait for face.
-        // Let's set isFaceMissing to true, and when face returns, we restart.
         setIsFaceMissing(true);
-        // Optionally show "Face Lost" screen which acts as a temporary game over
+        stopBGM();
       } else if (gameStateRef.current === "gameover") {
-        // If already gameover, we just mark face as missing so we know when it returns
         setIsFaceMissing(true);
       }
     }
@@ -655,23 +685,20 @@ export default function GameCanvas() {
     // --- Game Loop Update ---
     updateGameLogic(width, height);
 
-     // Player Character (Cursor)
+    // Player Character (Witch)
     const isMobile = width < 600;
-    const baseSize = isMobile ? 80 : 100; // Slightly larger for new character
+    const baseSize = isMobile ? 80 : 100;
     
     // Calculate Lean based on movement
-    const dx = cursorPosRef.current.x - (prevCursorXRef.current * width); // This logic needs fix, prevCursorXRef should store pixel or normalized? 
-    // Let's use normalized for consistency
     const currentX = cursorPosRef.current.x;
     const prevX = prevCursorXRef.current;
-    const diffX = currentX - prevX; // Pixel difference
+    const diffX = currentX - prevX;
     
-    // Update lean ref
     if (diffX < -2) leanRef.current = "left";
     else if (diffX > 2) leanRef.current = "right";
     else leanRef.current = "center";
     
-    prevCursorXRef.current = currentX; // Update for next frame
+    prevCursorXRef.current = currentX;
 
     // Select Image based on Lean and Mouth
     const isMouthOpenNow = isMouthOpenRef.current;
@@ -686,20 +713,19 @@ export default function GameCanvas() {
         playerImg = isMouthOpenNow ? imagesRef.current.playerCenterOpen : imagesRef.current.playerCenterClosed;
     }
     
-    // Fallback to old assets if new ones missing
     if (!playerImg) {
          playerImg = isMouthOpenNow ? imagesRef.current.cursorOpen : imagesRef.current.cursor;
     }
 
-    const cursorSize = isMouthOpenNow ? baseSize * 1.2 : baseSize; // Less dramatic size change for full body
+    const cursorSize = isMouthOpenNow ? baseSize * 1.2 : baseSize;
 
-    // Draw Aura if mouth is open
+    // Draw Magic Aura if mouth is open (Purple for Halloween)
     if (isMouthOpenNow) {
         ctx.beginPath();
         ctx.arc(cursorPosRef.current.x, cursorPosRef.current.y, cursorSize/1.5, 0, Math.PI * 2);
-        ctx.fillStyle = "rgba(255, 100, 100, 0.3)";
+        ctx.fillStyle = "rgba(147, 51, 234, 0.3)";
         ctx.fill();
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+        ctx.strokeStyle = "rgba(255, 200, 100, 0.8)";
         ctx.lineWidth = 4;
         ctx.stroke();
     }
@@ -713,8 +739,7 @@ export default function GameCanvas() {
         cursorSize
       );
     } else {
-        // Fallback if image not loaded
-        ctx.fillStyle = isMouthOpenNow ? "red" : "blue";
+        ctx.fillStyle = isMouthOpenNow ? "#9333ea" : "#6b21a8";
         ctx.beginPath();
         ctx.arc(cursorPosRef.current.x, cursorPosRef.current.y, cursorSize/2, 0, Math.PI*2);
         ctx.fill();
@@ -725,7 +750,9 @@ export default function GameCanvas() {
       if (e.type === "particle") {
         ctx.beginPath();
         ctx.arc(e.x, e.y, e.width/2, 0, Math.PI*2);
-        ctx.fillStyle = `rgba(255, 255, 0, ${(e.life || 0) / 20})`;
+        // Purple/orange particles for Halloween
+        const hue = Math.random() > 0.5 ? 280 : 30;
+        ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${(e.life || 0) / 20})`;
         ctx.fill();
       } else if (e.image) {
         ctx.save();
@@ -765,7 +792,7 @@ export default function GameCanvas() {
   };
 
   return (
-    <div className="relative w-full h-screen bg-pink-50 overflow-hidden flex flex-col items-center justify-center font-display">
+    <div className="relative w-full h-screen bg-purple-950 overflow-hidden flex flex-col items-center justify-center font-display">
       <Webcam
         ref={webcamRef}
         className="absolute opacity-0"
@@ -780,24 +807,23 @@ export default function GameCanvas() {
         height={windowSize.height}
       />
       
-      {/* UI Overlay - Responsive Layout */}
+      {/* UI Overlay - Halloween Theme */}
       <div className="absolute top-0 left-0 w-full p-2 md:p-4 z-10 flex flex-col md:flex-row md:items-start md:justify-between pointer-events-none">
         
         {/* Top Left: Title & Score */}
         <div className="flex flex-row md:flex-col items-center md:items-start justify-between md:justify-start gap-2 md:gap-4 w-full md:w-auto pointer-events-auto">
-          {/* Title - Hide on small mobile during play to save space, or make small */}
-          <h1 className="text-xl md:text-4xl text-pink-500 drop-shadow-sm tracking-wider hidden md:block" style={{ textShadow: '2px 2px 0px #fbcfe8' }}>Face Shooter</h1>
+          <h1 className="text-xl md:text-4xl text-purple-400 drop-shadow-sm tracking-wider hidden md:block" style={{ textShadow: '2px 2px 0px #1a0a2e, 0 0 10px #9333ea' }}>Witch Shooter</h1>
           
           {/* Score & Lives Container */}
-          <div className="flex items-center gap-2 md:gap-4 bg-white/80 backdrop-blur-sm p-2 rounded-xl border-2 border-pink-200 shadow-sm">
+          <div className="flex items-center gap-2 md:gap-4 bg-purple-900/80 backdrop-blur-sm p-2 rounded-xl border-2 border-purple-500 shadow-lg">
              {/* Score */}
              <div className="flex flex-col md:flex-row items-center gap-1 md:gap-2">
-               <span className="text-xs md:text-lg text-yellow-600 font-bold">SCORE</span>
-               <span className="text-lg md:text-3xl text-yellow-600 font-pixel tracking-widest">{score.toString().padStart(6, '0')}</span>
+               <span className="text-xs md:text-lg text-orange-400 font-bold">SCORE</span>
+               <span className="text-lg md:text-3xl text-orange-300 font-pixel tracking-widest">{score.toString().padStart(6, '0')}</span>
              </div>
              
              {/* Divider */}
-             <div className="w-px h-8 bg-pink-200 mx-1"></div>
+             <div className="w-px h-8 bg-purple-500 mx-1"></div>
 
              {/* Lives */}
              <div className="flex items-center gap-1">
@@ -813,20 +839,20 @@ export default function GameCanvas() {
           </div>
         </div>
 
-          {/* Top Right: Controls (Sensitivity & Status) */}
+        {/* Top Right: Controls */}
         <div className="flex flex-row md:flex-col items-center md:items-end gap-2 mt-2 md:mt-0 pointer-events-auto">
           
           {/* Difficulty Level */}
-          <div className="flex items-center gap-2 bg-white/80 backdrop-blur-sm px-3 py-1 rounded-full border-2 border-purple-300 shadow-sm">
-            <span className="text-xs md:text-sm font-bold text-purple-500 uppercase">LEVEL</span>
-            <span className="text-lg md:text-xl font-black text-purple-600">{difficulty}</span>
+          <div className="flex items-center gap-2 bg-purple-900/80 backdrop-blur-sm px-3 py-1 rounded-full border-2 border-orange-400 shadow-lg">
+            <span className="text-xs md:text-sm font-bold text-orange-400 uppercase">LEVEL</span>
+            <span className="text-lg md:text-xl font-black text-orange-300">{difficulty}</span>
           </div>
 
-          {/* Sensitivity Slider - Compact on mobile */}
-          <div className="flex flex-col items-end gap-1 bg-white/80 backdrop-blur-sm p-2 rounded-xl border-2 border-pink-200 shadow-sm">
+          {/* Sensitivity Slider */}
+          <div className="flex flex-col items-end gap-1 bg-purple-900/80 backdrop-blur-sm p-2 rounded-xl border-2 border-purple-500 shadow-lg">
             <div className="flex items-center gap-2">
-                <span className="text-xs md:text-sm font-bold text-pink-400 uppercase">SENSITIVITY</span>
-                <span className="text-xs font-mono text-pink-600">{sensitivity.toFixed(1)}</span>
+                <span className="text-xs md:text-sm font-bold text-purple-300 uppercase">SENSITIVITY</span>
+                <span className="text-xs font-mono text-purple-200">{sensitivity.toFixed(1)}</span>
             </div>
             <input 
               type="range" 
@@ -835,38 +861,38 @@ export default function GameCanvas() {
               step="0.1" 
               value={sensitivity} 
               onChange={(e) => setSensitivity(parseFloat(e.target.value))}
-              className="accent-pink-500 h-2 md:h-3 w-24 md:w-32 bg-pink-200 rounded-lg appearance-none cursor-pointer"
+              className="accent-purple-500 h-2 md:h-3 w-24 md:w-32 bg-purple-700 rounded-lg appearance-none cursor-pointer"
             />
-            <div className="text-[10px] text-gray-500">Adjust if mouth not detecting</div>
+            <div className="text-[10px] text-purple-400">Adjust if mouth not detecting</div>
           </div>
 
           {/* Mouth Status */}
-          <div className={`px-3 py-1 rounded-full text-xs md:text-sm font-bold transition-all duration-200 border-2 ${isMouthOpen ? 'bg-red-400 text-white border-red-500 shadow-md' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
-            {isMouthOpen ? "MOUTH OPEN 👄" : "MOUTH CLOSED 😐"}
+          <div className={`px-3 py-1 rounded-full text-xs md:text-sm font-bold transition-all duration-200 border-2 ${isMouthOpen ? 'bg-orange-500 text-white border-orange-400 shadow-lg shadow-orange-500/50' : 'bg-purple-800 text-purple-400 border-purple-600'}`}>
+            {isMouthOpen ? "CASTING SPELL ✨" : "READY 🧙‍♀️"}
           </div>
         </div>
 
       </div>
 
       {gameState === "gameover" && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl text-center border-4 md:border-8 border-pink-400 animate-bounce-in w-full max-w-sm md:max-w-md relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-4 bg-pink-400"></div>
-            <h2 className="text-4xl md:text-6xl text-pink-500 mb-2 drop-shadow-md mt-4">GAME OVER</h2>
-            <div className="text-lg md:text-2xl text-gray-400 mb-6 md:mb-8 font-body">
-              {lives <= 0 ? "No Lives Left!" : "Face Lost!"}
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-gradient-to-b from-purple-900 to-purple-950 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl text-center border-4 md:border-8 border-orange-500 animate-bounce-in w-full max-w-sm md:max-w-md relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-orange-500 via-purple-500 to-orange-500"></div>
+            <h2 className="text-4xl md:text-6xl text-orange-400 mb-2 drop-shadow-md mt-4" style={{ textShadow: '0 0 20px #f97316' }}>GAME OVER</h2>
+            <div className="text-lg md:text-2xl text-purple-300 mb-6 md:mb-8 font-body">
+              {lives <= 0 ? "The monsters got you!" : "You vanished!"}
             </div>
             
-            <div className="bg-yellow-100 p-4 md:p-6 rounded-3xl mb-6 md:mb-8 border-4 border-yellow-300 transform rotate-1">
-              <div className="text-xs md:text-sm text-yellow-600 font-bold uppercase tracking-wider">Final Score</div>
-              <div className="text-4xl md:text-6xl text-yellow-500 font-pixel mt-2 drop-shadow-sm">{score}</div>
+            <div className="bg-purple-800/50 p-4 md:p-6 rounded-3xl mb-6 md:mb-8 border-4 border-orange-400 transform rotate-1">
+              <div className="text-xs md:text-sm text-orange-300 font-bold uppercase tracking-wider">Final Score</div>
+              <div className="text-4xl md:text-6xl text-orange-400 font-pixel mt-2 drop-shadow-sm" style={{ textShadow: '0 0 10px #f97316' }}>{score}</div>
             </div>
 
             <button 
               onClick={restartGame}
-              className="w-full py-3 md:py-4 bg-gradient-to-b from-pink-400 to-pink-500 text-white rounded-2xl font-bold text-xl md:text-2xl shadow-[0_6px_0_#be185d] active:shadow-none active:translate-y-[6px] transition-all hover:brightness-110"
+              className="w-full py-3 md:py-4 bg-gradient-to-b from-orange-500 to-orange-600 text-white rounded-2xl font-bold text-xl md:text-2xl shadow-[0_6px_0_#c2410c] active:shadow-none active:translate-y-[6px] transition-all hover:brightness-110"
             >
-              TRY AGAIN
+              TRY AGAIN 🎃
             </button>
           </div>
         </div>
@@ -874,37 +900,37 @@ export default function GameCanvas() {
       
       {/* Face Missing Overlay */}
       {isFaceMissing && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-white p-6 rounded-2xl shadow-xl text-center animate-pulse">
-            <div className="text-4xl mb-2">👀</div>
-            <h2 className="text-2xl font-bold text-pink-500">FACE LOST!</h2>
-            <p className="text-gray-500">Show face to RESTART game</p>
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-purple-900 p-6 rounded-2xl shadow-xl text-center animate-pulse border-4 border-purple-500">
+            <div className="text-4xl mb-2">🧙‍♀️</div>
+            <h2 className="text-2xl font-bold text-purple-300">WITCH VANISHED!</h2>
+            <p className="text-purple-400">Show face to RESTART game</p>
           </div>
         </div>
       )}
 
       {gameState === "start" && (
-        <div className="absolute inset-0 z-40 flex items-center justify-center bg-white/30 backdrop-blur-sm p-4">
-           <div className="bg-white/90 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-xl border-4 md:border-8 border-blue-300 text-center animate-pulse w-full max-w-sm md:max-w-lg">
-             <h2 className="text-3xl md:text-5xl text-blue-500 mb-4 md:mb-6 font-display">Ready?</h2>
-             <p className="text-lg md:text-2xl text-gray-600 mb-6 md:mb-8">Show your face to start!</p>
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+           <div className="bg-gradient-to-b from-purple-900 to-purple-950 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-xl border-4 md:border-8 border-purple-500 text-center animate-pulse w-full max-w-sm md:max-w-lg">
+             <h2 className="text-3xl md:text-5xl text-purple-300 mb-4 md:mb-6 font-display" style={{ textShadow: '0 0 20px #9333ea' }}>Ready, Witch?</h2>
+             <p className="text-lg md:text-2xl text-purple-400 mb-6 md:mb-8">Show your face to start!</p>
              
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 text-left bg-blue-50 p-4 md:p-6 rounded-2xl border-2 border-blue-100">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 text-left bg-purple-800/50 p-4 md:p-6 rounded-2xl border-2 border-purple-600">
                <div className="flex items-center gap-3">
-                 <span className="text-2xl">😐</span>
-                 <span className="text-sm font-bold text-gray-500">Move head to AIM</span>
+                 <span className="text-2xl">🧙‍♀️</span>
+                 <span className="text-sm font-bold text-purple-300">Move head to AIM</span>
                </div>
                <div className="flex items-center gap-3">
-                 <span className="text-2xl">👄</span>
-                 <span className="text-sm font-bold text-gray-500">Open mouth to SHOOT</span>
+                 <span className="text-2xl">✨</span>
+                 <span className="text-sm font-bold text-purple-300">Open mouth to CAST</span>
                </div>
                <div className="flex items-center gap-3">
-                 <img src={ASSETS.kappa} className="w-8 h-8" alt="enemy"/>
-                 <span className="text-sm font-bold text-gray-500">Avoid Enemies</span>
+                 <img src={ASSETS.vampire} className="w-8 h-8" alt="enemy"/>
+                 <span className="text-sm font-bold text-purple-300">Defeat Monsters</span>
                </div>
                <div className="flex items-center gap-3">
                  <img src={ASSETS.powerup} className="w-8 h-8" alt="powerup"/>
-                 <span className="text-sm font-bold text-gray-500">Get Powerups!</span>
+                 <span className="text-sm font-bold text-purple-300">Get Pumpkins!</span>
                </div>
              </div>
            </div>
