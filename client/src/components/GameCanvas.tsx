@@ -16,8 +16,11 @@ type Entity = {
   vx: number;
   vy: number;
   type: "missile" | "enemy" | "particle" | "powerup";
-  enemyType?: "vampire" | "werewolf" | "mummy" | "frankenstein";
-  life?: number; // For particles
+  isBoss?: boolean;
+  isProjectile?: boolean;
+  maxLife?: number;
+  enemyType?: "vampire" | "werewolf" | "mummy" | "frankenstein" | "reaper" | "demon";
+  life?: number;
   image?: HTMLImageElement;
   rotation?: number;
   scale?: number;
@@ -39,12 +42,16 @@ const ASSETS = {
   
   // Projectile (Magic Star)
   missile: "/images/projectile_voice.png",
+  enemyFireball: "/images/enemy_fireball.png",
   
   // Enemies (Halloween Monsters)
   vampire: "/images/yokai_vampire.png",
   werewolf: "/images/yokai_werewolf.png",
   mummy: "/images/yokai_mummy.png",
   frankenstein: "/images/yokai_frankenstein.png",
+  // Boss enemies (reuse existing images as bosses)
+  reaper: "/images/yokai_mummy.png", // Larger mummy as boss
+  demon: "/images/yokai_frankenstein.png", // Larger frankenstein as boss
   
   // Powerup (Pumpkin)
   powerup: "/images/item_powerup.png",
@@ -191,9 +198,9 @@ const stopBGM = () => {
 // --- Constants ---
 const MISSILE_SPEED = 15;
 const ENEMY_SPEED_BASE = 3;
-const SPAWN_RATE = 60; // Frames between spawns
+const SPAWN_RATE = 60;
 const MOUTH_OPEN_THRESHOLD = 0.05;
-const MOUTH_COOLDOWN = 10; // Frames between shots
+const MOUTH_COOLDOWN = 10;
 const MAX_LIVES = 5;
 
 export default function GameCanvas() {
@@ -210,10 +217,15 @@ export default function GameCanvas() {
   const [sensitivity, setSensitivity] = useState(1.5);
   const [isMouthOpen, setIsMouthOpen] = useState(false);
   const isMouthOpenRef = useRef(false);
+  const wasMouthOpenRef = useRef(false);
   useEffect(() => { isMouthOpenRef.current = isMouthOpen; }, [isMouthOpen]);
   const [difficulty, setDifficulty] = useState(1);
   const difficultyRef = useRef(1);
-  const [powerLevel, setPowerLevel] = useState(1); // 1: Normal, 2: Double, 3: Triple
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [showBossWarning, setShowBossWarning] = useState(false);
+  const bossActiveRef = useRef(false);
+  const bossSpawnedForLevelRef = useRef(0);
+  const [powerLevel, setPowerLevel] = useState(1);
   const [windowSize, setWindowSize] = useState({ width: 1280, height: 720 });
   
   // Refs for game loop logic
@@ -245,6 +257,20 @@ export default function GameCanvas() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Take Damage Helper
+  const takeDamage = () => {
+    playSound("damage");
+    livesRef.current--;
+    setLives(livesRef.current);
+    damageEffectRef.current = 20;
+    
+    if (livesRef.current <= 0) {
+      playSound("gameover");
+      stopBGM();
+      setGameState("gameover");
+    }
+  };
+
   // Load images and audio on mount
   useEffect(() => {
     const loadImg = (src: string) => {
@@ -265,12 +291,15 @@ export default function GameCanvas() {
       cursor: loadImg(ASSETS.cursor),
       cursorOpen: loadImg(ASSETS.cursorOpen),
       missile: loadImg(ASSETS.missile),
+      enemyFireball: loadImg(ASSETS.enemyFireball),
       
       // Halloween Enemies
       vampire: loadImg(ASSETS.vampire),
       werewolf: loadImg(ASSETS.werewolf),
       mummy: loadImg(ASSETS.mummy),
       frankenstein: loadImg(ASSETS.frankenstein),
+      reaper: loadImg(ASSETS.reaper),
+      demon: loadImg(ASSETS.demon),
       
       powerup: loadImg(ASSETS.powerup),
       heart: loadImg(ASSETS.heart),
@@ -324,34 +353,55 @@ export default function GameCanvas() {
   const gameStateRef = useRef(gameState);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
 
-  const spawnEnemy = (width: number, height: number, speedMultiplier: number = 1.0) => {
+  const spawnEnemy = (width: number, height: number, speedMultiplier: number = 1.0, forceBoss: boolean = false) => {
     const rand = Math.random();
-    let type: "vampire" | "werewolf" | "mummy" | "frankenstein" = "vampire";
+    let type: "vampire" | "werewolf" | "mummy" | "frankenstein" | "reaper" | "demon" = "vampire";
     let img = imagesRef.current.vampire;
     let speed = ENEMY_SPEED_BASE * speedMultiplier;
     const isMobile = width < 600;
-    let size = isMobile ? 50 : 70;
+    let size = isMobile ? 100 : 210;
+    let isBoss = false;
+    let life = 3;
 
-    if (rand < 0.25) {
-      type = "vampire";
-      img = imagesRef.current.vampire;
-      speed = ENEMY_SPEED_BASE * 1.2; // Fast
-    } else if (rand < 0.5) {
-      type = "werewolf";
-      img = imagesRef.current.werewolf;
-      speed = ENEMY_SPEED_BASE * 1.0;
-    } else if (rand < 0.75) {
-      type = "mummy";
-      img = imagesRef.current.mummy;
-      speed = ENEMY_SPEED_BASE * 0.8; // Slow
+    // Boss Spawn Logic
+    if (forceBoss) {
+      isBoss = true;
+      size = isMobile ? 200 : 420;
+      life = 6;
+      speed = ENEMY_SPEED_BASE * 0.8;
+      
+      // Randomize Boss (Halloween theme)
+      const bossRand = Math.random();
+      if (bossRand < 0.5) {
+        type = "reaper";
+        img = imagesRef.current.reaper;
+      } else {
+        type = "demon";
+        img = imagesRef.current.demon;
+      }
     } else {
-      type = "frankenstein";
-      img = imagesRef.current.frankenstein;
-      speed = ENEMY_SPEED_BASE * 0.9;
+      // Normal Enemy Spawn Logic
+      if (rand < 0.25) {
+        type = "vampire";
+        img = imagesRef.current.vampire;
+        speed = ENEMY_SPEED_BASE * 1.2;
+      } else if (rand < 0.5) {
+        type = "werewolf";
+        img = imagesRef.current.werewolf;
+        speed = ENEMY_SPEED_BASE * 1.0;
+      } else if (rand < 0.75) {
+        type = "mummy";
+        img = imagesRef.current.mummy;
+        speed = ENEMY_SPEED_BASE * 0.8;
+      } else {
+        type = "frankenstein";
+        img = imagesRef.current.frankenstein;
+        speed = ENEMY_SPEED_BASE * 0.9;
+      }
     }
 
     const x = Math.random() * (width - size);
-    const y = -size; 
+    const y = isBoss ? -size * 0.5 : -size;
     
     entitiesRef.current.push({
       id: Math.random(),
@@ -364,13 +414,15 @@ export default function GameCanvas() {
       type: "enemy",
       enemyType: type,
       image: img,
-      life: 1,
+      life: life,
+      maxLife: life,
+      isBoss: isBoss,
     });
   };
 
   const spawnPowerup = (width: number, height: number) => {
     const isMobile = width < 600;
-    const size = isMobile ? 40 : 50;
+    const size = isMobile ? 80 : 150;
     const x = Math.random() * (width - size);
     const y = -size;
     
@@ -389,7 +441,7 @@ export default function GameCanvas() {
 
   const spawnMissile = (x: number, y: number) => {
     const isMobile = windowSize.width < 600;
-    const size = isMobile ? 30 : 40;
+    const size = isMobile ? 60 : 80;
 
     const createMissile = (offsetX: number, angle: number) => {
       entitiesRef.current.push({
@@ -443,114 +495,214 @@ export default function GameCanvas() {
     if (gameStateRef.current !== "playing") return;
 
     frameCountRef.current++;
-    
-    // Difficulty scaling
-    const newDifficulty = Math.floor(scoreRef.current / 500) + 1;
-    if (newDifficulty !== difficultyRef.current) {
-      difficultyRef.current = newDifficulty;
-      setDifficulty(newDifficulty);
-    }
-    const speedMultiplier = 1 + (difficultyRef.current - 1) * 0.15;
-    const spawnRateAdjusted = Math.max(20, SPAWN_RATE - (difficultyRef.current - 1) * 5);
+    if (damageEffectRef.current > 0) damageEffectRef.current--;
 
-    // Spawn enemies
-    if (frameCountRef.current % spawnRateAdjusted === 0) {
-      spawnEnemy(width, height, speedMultiplier);
+    // --- Leveling System ---
+    const targetLevel = Math.floor(scoreRef.current / 500) + 1;
+    
+    if (targetLevel > difficultyRef.current && !bossActiveRef.current && bossSpawnedForLevelRef.current < targetLevel) {
+      spawnEnemy(width, height, 1.0, true);
+      bossActiveRef.current = true;
+      bossSpawnedForLevelRef.current = targetLevel;
+      setShowBossWarning(true);
+      setTimeout(() => setShowBossWarning(false), 3000);
+      playSound("gameover");
+    }
+
+    const currentSpawnRate = Math.max(20, SPAWN_RATE - (difficultyRef.current * 5));
+    const speedMultiplier = 1 + (difficultyRef.current * 0.1);
+
+    // Spawn Enemies (Only if boss is NOT active)
+    if (!bossActiveRef.current && frameCountRef.current % currentSpawnRate === 0) {
+      spawnEnemy(width, height, speedMultiplier, false);
+    }
+    
+    // Boss Attack Logic
+    if (bossActiveRef.current && frameCountRef.current % 120 === 0) {
+      const boss = entitiesRef.current.find(e => e.isBoss);
+      if (boss) {
+        const dx = cursorPosRef.current.x - (boss.x + boss.width/2);
+        const dy = cursorPosRef.current.y - (boss.y + boss.height/2);
+        const dist = Math.hypot(dx, dy);
+        const speed = 10;
+        
+        entitiesRef.current.push({
+          id: Math.random(),
+          x: boss.x + boss.width/2 - 40,
+          y: boss.y + boss.height/2,
+          width: 80,
+          height: 80,
+          vx: (dx / dist) * speed,
+          vy: (dy / dist) * speed,
+          type: "enemy",
+          isProjectile: true,
+          image: imagesRef.current.enemyFireball,
+          life: 1,
+          maxLife: 1
+        });
+      }
+    }
+    
+    // Check if boss is still active
+    if (bossActiveRef.current) {
+      const bossExists = entitiesRef.current.some(e => e.isBoss);
+      if (!bossExists) {
+        bossActiveRef.current = false;
+      }
     }
     
     // Spawn powerups occasionally
+    const spawnRateAdjusted = Math.max(20, SPAWN_RATE - (difficultyRef.current - 1) * 5);
     if (frameCountRef.current % (spawnRateAdjusted * 5) === 0 && Math.random() < 0.3) {
       spawnPowerup(width, height);
     }
 
-    // Update entities
-    entitiesRef.current = entitiesRef.current.filter(e => {
-      // Update position
-      e.x += e.vx;
-      e.y += e.vy;
-
-      // Particles fade
-      if (e.type === "particle") {
-        e.life = (e.life || 0) - 1;
-        if (e.life <= 0) return false;
+    // Update Entities
+    entitiesRef.current.forEach(entity => {
+      entity.x += entity.vx;
+      entity.y += entity.vy;
+      
+      if (entity.type === "particle" && entity.life !== undefined) {
+        entity.life--;
+        entity.vy += 0.2;
       }
 
-      // Remove off-screen
-      if (e.y > height + 100 || e.y < -200 || e.x < -100 || e.x > width + 100) {
+      // Add sparkle effect to Powerups
+      if (entity.type === "powerup" && frameCountRef.current % 5 === 0) {
+        entitiesRef.current.push({
+          id: Math.random(),
+          x: entity.x + Math.random() * entity.width,
+          y: entity.y + Math.random() * entity.height,
+          width: 5,
+          height: 5,
+          vx: (Math.random() - 0.5) * 2,
+          vy: (Math.random() - 0.5) * 2,
+          type: "particle",
+          life: 20,
+          image: undefined,
+        });
+      }
+    });
+
+    // Remove dead entities
+    entitiesRef.current = entitiesRef.current.filter(e => {
+      if (e.type === "particle") return (e.life || 0) > 0;
+      
+      if (e.y > height + 50) {
+        if (e.type === "enemy") {
+          takeDamage();
+          
+          if (e.isBoss) {
+            bossActiveRef.current = false;
+            bossSpawnedForLevelRef.current = targetLevel - 1;
+          }
+        }
         return false;
       }
-
+      
+      const topLimit = -600;
+      if (e.y < topLimit || e.x < -100 || e.x > width + 100) return false;
+      
       return true;
     });
 
-    // Collision detection
-    const playerX = cursorPosRef.current.x;
-    const playerY = cursorPosRef.current.y;
-    const playerRadius = 40;
+    // Collision Detection
+    const missiles = entitiesRef.current.filter(e => e.type === "missile");
+    const enemies = entitiesRef.current.filter(e => e.type === "enemy");
+    const powerups = entitiesRef.current.filter(e => e.type === "powerup");
+    
+    const isMobile = width < 600;
+    const hitboxSize = isMobile ? 100 : 250;
+    const playerHitbox = {
+      x: cursorPosRef.current.x - hitboxSize/2,
+      y: cursorPosRef.current.y - hitboxSize/2,
+      width: hitboxSize,
+      height: hitboxSize
+    };
 
-    entitiesRef.current.forEach(e => {
-      if (e.type === "enemy") {
-        // Check collision with missiles
-        entitiesRef.current.forEach(m => {
-          if (m.type === "missile") {
-            const dx = (e.x + e.width/2) - (m.x + m.width/2);
-            const dy = (e.y + e.height/2) - (m.y + m.height/2);
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist < (e.width/2 + m.width/2) * 0.8) {
-              // Hit!
-              spawnExplosion(e.x + e.width/2, e.y + e.height/2);
-              playSound("explosion");
-              scoreRef.current += 100;
-              setScore(scoreRef.current);
-              e.y = height + 999; // Remove enemy
-              m.y = -999; // Remove missile
+    // 1. Missile vs Enemy
+    missiles.forEach(m => {
+      enemies.forEach(e => {
+        if (e.isProjectile) return;
+
+        if (
+          m.x < e.x + e.width &&
+          m.x + m.width > e.x &&
+          m.y < e.y + e.height &&
+          m.y + m.height > e.y
+        ) {
+          m.y = -999;
+          
+          if (e.life) e.life--;
+          
+          if (e.life && e.life > 0) {
+            spawnExplosion(e.x + e.width/2, e.y + e.height/2, "white");
+            playSound("damage");
+          } else {
+            spawnExplosion(e.x + e.width/2, e.y + e.height/2);
+            playSound("explosion");
+            
+            e.y = height + 999;
+            e.life = 0;
+            e.type = "particle";
+            
+            scoreRef.current += e.isBoss ? 1000 : 100;
+            setScore(scoreRef.current);
+            
+            if (e.isBoss) {
+              bossActiveRef.current = false;
+              const newLevel = difficultyRef.current + 1;
+              setDifficulty(newLevel);
+              difficultyRef.current = newLevel;
+              setShowLevelUp(true);
+              setTimeout(() => setShowLevelUp(false), 3000);
+              playSound("powerup");
+              bossSpawnedForLevelRef.current = newLevel;
             }
           }
-        });
-
-        // Check collision with player
-        const dx = (e.x + e.width/2) - playerX;
-        const dy = (e.y + e.height/2) - playerY;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist < (e.width/2 + playerRadius) * 0.7) {
-          // Player hit!
-          playSound("damage");
-          livesRef.current--;
-          setLives(livesRef.current);
-          damageEffectRef.current = 20;
-          e.y = height + 999; // Remove enemy
-          
-          if (livesRef.current <= 0) {
-            playSound("gameover");
-            stopBGM();
-            setGameState("gameover");
-          }
         }
-      }
+      });
+    });
 
-      // Powerup collision
-      if (e.type === "powerup") {
-        const dx = (e.x + e.width/2) - playerX;
-        const dy = (e.y + e.height/2) - playerY;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        if (dist < (e.width/2 + playerRadius) * 0.8) {
-          playSound("powerup");
-          setPowerLevel(prev => Math.min(prev + 1, 3));
-          e.y = height + 999;
-          
-          // Heal one life
-          if (livesRef.current < MAX_LIVES) {
-            livesRef.current++;
-            setLives(livesRef.current);
-          }
-        }
+    // 2. Player vs Enemy
+    enemies.forEach(e => {
+      if (e.type !== "enemy") return;
+      if ((e.life ?? 0) <= 0) return;
+      if (e.y > height) return;
+
+      if (
+        playerHitbox.x < e.x + e.width &&
+        playerHitbox.x + playerHitbox.width > e.x &&
+        playerHitbox.y < e.y + e.height &&
+        playerHitbox.y + playerHitbox.height > e.y
+      ) {
+        spawnExplosion(e.x + e.width/2, e.y + e.height/2, "red");
+        takeDamage();
+        
+        e.y = height + 999;
+        e.life = 0;
+        e.type = "particle";
       }
     });
 
-    // Decrease damage effect
-    if (damageEffectRef.current > 0) {
-      damageEffectRef.current--;
-    }
+    // 3. Player vs Powerup
+    powerups.forEach(p => {
+      if (
+        playerHitbox.x < p.x + p.width &&
+        playerHitbox.x + playerHitbox.width > p.x &&
+        playerHitbox.y < p.y + p.height &&
+        playerHitbox.y + playerHitbox.height > p.y
+      ) {
+        playSound("powerup");
+        setPowerLevel(prev => Math.min(prev + 1, 3));
+        p.y = height + 999;
+        
+        if (livesRef.current < MAX_LIVES) {
+          livesRef.current++;
+          setLives(livesRef.current);
+        }
+      }
+    });
   };
 
   const onResults = (results: Results) => {
@@ -563,7 +715,6 @@ export default function GameCanvas() {
     const width = canvas.width;
     const height = canvas.height;
 
-    // Clear
     ctx.clearRect(0, 0, width, height);
     
     // Draw Background
@@ -660,15 +811,11 @@ export default function GameCanvas() {
         }, 0);
       }
       
-      // Shoot
-      if (isOpen && mouthCooldownRef.current <= 0 && gameStateRef.current === "playing") {
+      // Shoot (Semi-auto: Only on Close -> Open transition)
+      if (isOpen && !wasMouthOpenRef.current && gameStateRef.current === "playing") {
         spawnMissile(visualX, visualY);
-        mouthCooldownRef.current = MOUTH_COOLDOWN;
       }
-      
-      if (mouthCooldownRef.current > 0) {
-        mouthCooldownRef.current--;
-      }
+      wasMouthOpenRef.current = isOpen;
 
     } else {
       faceDetectedRef.current = false;
@@ -687,15 +834,16 @@ export default function GameCanvas() {
 
     // Player Character (Witch)
     const isMobile = width < 600;
-    const baseSize = isMobile ? 80 : 100;
+    const baseSize = isMobile ? 120 : 250;
     
     // Calculate Lean based on movement
     const currentX = cursorPosRef.current.x;
     const prevX = prevCursorXRef.current;
-    const diffX = currentX - prevX;
+    const moveDiffX = currentX - prevX;
     
-    if (diffX < -2) leanRef.current = "left";
-    else if (diffX > 2) leanRef.current = "right";
+    // Inverted lean direction
+    if (moveDiffX < -2) leanRef.current = "right";
+    else if (moveDiffX > 2) leanRef.current = "left";
     else leanRef.current = "center";
     
     prevCursorXRef.current = currentX;
@@ -760,6 +908,28 @@ export default function GameCanvas() {
         if (e.rotation) ctx.rotate(e.rotation);
         ctx.drawImage(e.image, -e.width/2, -e.height/2, e.width, e.height);
         ctx.restore();
+        
+        // Draw HP bar for enemies with life > 1
+        if (e.type === "enemy" && e.maxLife && e.maxLife > 1 && e.life && e.life > 0) {
+          const barWidth = e.width * 0.8;
+          const barHeight = 8;
+          const barX = e.x + (e.width - barWidth) / 2;
+          const barY = e.y - 15;
+          
+          // Background
+          ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+          ctx.fillRect(barX, barY, barWidth, barHeight);
+          
+          // HP
+          const hpPercent = e.life / e.maxLife;
+          ctx.fillStyle = e.isBoss ? "#ff6b35" : "#9333ea";
+          ctx.fillRect(barX, barY, barWidth * hpPercent, barHeight);
+          
+          // Border
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(barX, barY, barWidth, barHeight);
+        }
       }
     });
   };
@@ -787,8 +957,12 @@ export default function GameCanvas() {
     setLives(MAX_LIVES);
     livesRef.current = MAX_LIVES;
     setPowerLevel(1);
+    setDifficulty(1);
+    difficultyRef.current = 1;
     entitiesRef.current = [];
     setGameState("start");
+    bossActiveRef.current = false;
+    bossSpawnedForLevelRef.current = 0;
   };
 
   return (
@@ -874,9 +1048,26 @@ export default function GameCanvas() {
 
       </div>
 
+      {showLevelUp && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div className="text-6xl md:text-9xl font-black text-orange-400 drop-shadow-[0_5px_5px_rgba(0,0,0,0.5)] animate-bounce font-pixel" style={{ textShadow: '0 0 30px #f97316' }}>
+                LEVEL UP!
+            </div>
+        </div>
+      )}
+
+      {showBossWarning && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+            <div className="text-5xl md:text-8xl font-black text-red-600 drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)] animate-pulse font-pixel bg-black/50 p-4 rounded-xl">
+                WARNING!
+                <div className="text-2xl md:text-4xl text-white mt-2">BOSS APPROACHING</div>
+            </div>
+        </div>
+      )}
+
       {gameState === "gameover" && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-gradient-to-b from-purple-900 to-purple-950 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl text-center border-4 md:border-8 border-orange-500 animate-bounce-in w-full max-w-sm md:max-w-md relative overflow-hidden">
+          <div className="bg-gradient-to-b from-purple-900 to-purple-950 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-2xl text-center border-4 md:border-8 border-orange-500 animate-bounce w-full max-w-sm md:max-w-md relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-orange-500 via-purple-500 to-orange-500"></div>
             <h2 className="text-4xl md:text-6xl text-orange-400 mb-2 drop-shadow-md mt-4" style={{ textShadow: '0 0 20px #f97316' }}>GAME OVER</h2>
             <div className="text-lg md:text-2xl text-purple-300 mb-6 md:mb-8 font-body">
