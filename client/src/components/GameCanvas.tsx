@@ -450,13 +450,22 @@ export default function GameCanvas() {
                 maxLife: 1
             });
         }
-    } else if (bossActiveRef.current) {
-        // Boss active but not found? It might have escaped or been removed incorrectly.
-        // Check if we should respawn it or reset state.
-        // If bossSpawnedForLevelRef matches targetLevel, it means we spawned it.
-        // If it's gone and we didn't level up, we are stuck.
-        // Let's reset bossActiveRef so it can spawn again.
-        bossActiveRef.current = false;
+    } 
+    
+    // --- FIX: Check if boss is actually active ---
+    // If bossActiveRef is true, but no boss entity exists, it means boss escaped or was removed incorrectly.
+    // We must reset bossActiveRef to false so normal enemies can spawn again.
+    if (bossActiveRef.current) {
+        const bossExists = entitiesRef.current.some(e => e.isBoss);
+        if (!bossExists) {
+            // Boss is gone! Reset state.
+            bossActiveRef.current = false;
+            // Also, if we didn't kill it (level didn't increase), we should probably allow it to spawn again later?
+            // Or just skip it for this level? 
+            // Let's assume if it escaped, we just continue to normal enemies until next score threshold.
+            // But we need to make sure bossSpawnedForLevelRef is set correctly.
+            // It was set when we spawned it. So it won't spawn again for this level. Correct.
+        }
     }
     
     // Spawn Powerup (Rare)
@@ -504,7 +513,7 @@ export default function GameCanvas() {
           // If Boss passed bottom, reset boss state so it respawns
           if (e.isBoss) {
               bossActiveRef.current = false;
-              // Reduce boss spawn level ref so it triggers again
+              // Reduce boss spawn level ref so it triggers again immediately
               bossSpawnedForLevelRef.current = targetLevel - 1; 
           }
         }
@@ -584,16 +593,6 @@ export default function GameCanvas() {
     });
 
     // 2. Player vs Enemy (Collision)
-    // Re-fetch enemies to ensure we are checking against current state
-    // (Though in this synchronous loop, 'enemies' array from line 388 still holds references to objects)
-    // The issue might be that we are modifying 'e' in the missile loop (changing type to particle)
-    // and then filtering 'enemies' based on type="enemy" at line 388 BEFORE the missile loop runs?
-    // Wait, line 388 runs before missile loop. So 'enemies' array contains all enemies that were enemies at start of frame.
-    // In missile loop (line 402), we change e.type to "particle".
-    // In player loop (line 425), we iterate over the SAME 'enemies' array.
-    // So 'e' inside this loop IS the same object.
-    // We need to check if e.type is still "enemy".
-    
     enemies.forEach(e => {
       // Check if enemy is still valid (might have been killed by missile in this same frame)
       if (e.type !== "enemy") return; 
@@ -770,7 +769,6 @@ export default function GameCanvas() {
       if (gameStateRef.current === "playing") {
         // User said: "顔が外れるとゲーム終了"
         // So we set state to gameover or just reset to start?
-        // "戻ると最初からゲーム開始" implies we should go to a state where we wait for face.
         // Let's set isFaceMissing to true, and when face returns, we restart.
         setIsFaceMissing(true);
         // Optionally show "Face Lost" screen which acts as a temporary game over
@@ -891,6 +889,8 @@ export default function GameCanvas() {
     setPowerLevel(1);
     entitiesRef.current = [];
     setGameState("start");
+    bossActiveRef.current = false; // Reset boss state
+    bossSpawnedForLevelRef.current = 0; // Reset boss spawn level
   };
 
   return (
