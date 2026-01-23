@@ -410,7 +410,8 @@ export default function GameCanvas() {
           
           m.y = -999; // Remove missile
           e.y = height + 999; // Remove enemy
-          e.life = 0; // Mark as dead explicitly to avoid player collision
+          e.life = 0; // Mark as dead explicitly
+          e.type = "particle"; // Change type to avoid any further collision checks
           
           scoreRef.current += 100;
           setScore(scoreRef.current);
@@ -420,7 +421,8 @@ export default function GameCanvas() {
 
     // 2. Player vs Enemy (Collision)
     enemies.forEach(e => {
-      if ((e.life ?? 0) <= 0) return; // Skip dead enemies (killed by missile)
+      if (e.type !== "enemy") return; // Double check type
+      if ((e.life ?? 0) <= 0) return; // Skip dead enemies
       if (e.y > height + 100) return; // Skip out of bounds enemies
 
       if (
@@ -433,6 +435,7 @@ export default function GameCanvas() {
         takeDamage();
         e.y = height + 999; // Remove enemy
         e.life = 0; // Mark as dead
+        e.type = "particle"; // Change type to avoid any further collision checks
       }
     });
 
@@ -563,8 +566,11 @@ export default function GameCanvas() {
         // If face was missing (in any state: playing, gameover, start), and now detected:
         // "戻ると最初からゲーム開始" -> Always restart
         restartGame();
-        setGameState("playing");
-        setIsFaceMissing(false);
+        // Force state update immediately after restart
+        setTimeout(() => {
+            setGameState("playing");
+            setIsFaceMissing(false);
+        }, 0);
       }
       
       // Shoot
