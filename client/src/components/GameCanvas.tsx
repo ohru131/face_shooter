@@ -263,20 +263,21 @@ export default function GameCanvas() {
         speed = ENEMY_SPEED_BASE * 0.8; // Boss moves at decent speed (not too slow)
         type = "lantern"; // Boss appearance
         img = imagesRef.current.lantern; // Placeholder, ideally specific boss image
-    }
-
-    if (rand < 0.33) {
-      type = "kappa";
-      img = imagesRef.current.kappa;
-      if (!isBoss) speed = ENEMY_SPEED_BASE * 1.2; 
-    } else if (rand < 0.66) {
-      type = "umbrella";
-      img = imagesRef.current.umbrella;
-      if (!isBoss) speed = ENEMY_SPEED_BASE * 0.8; 
     } else {
-      type = "lantern";
-      img = imagesRef.current.lantern;
-      if (!isBoss) speed = ENEMY_SPEED_BASE;
+        // Normal Enemy Spawn Logic
+        if (rand < 0.33) {
+          type = "kappa";
+          img = imagesRef.current.kappa;
+          speed = ENEMY_SPEED_BASE * 1.2; 
+        } else if (rand < 0.66) {
+          type = "umbrella";
+          img = imagesRef.current.umbrella;
+          speed = ENEMY_SPEED_BASE * 0.8; 
+        } else {
+          type = "lantern";
+          img = imagesRef.current.lantern;
+          speed = ENEMY_SPEED_BASE;
+        }
     }
 
     const x = Math.random() * (width - size);
