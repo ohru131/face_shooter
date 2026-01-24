@@ -219,6 +219,8 @@ export default function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cameraConstraintIndex, setCameraConstraintIndex] = useState(0);
   const cameraConstraintIndexRef = useRef(0);
+  const [useNativeAPI, setUseNativeAPI] = useState(false);
+  const nativeStreamRef = useRef(null);
   
   // Aggressive fallback strategy for Samsung tablet compatibility
   // Start with absolutely minimal constraints and progressively add more
@@ -1114,6 +1116,54 @@ export default function GameCanvas() {
     bossSpawnedForLevelRef.current = 0;
   };
 
+  // Native getUserMedia API fallback for Samsung devices
+  const initializeNativeCamera = async () => {
+    console.log("Attempting to initialize camera using native getUserMedia API...");
+    try {
+      // Try with minimal constraints first
+      const constraints = [
+        { audio: false, video: { facingMode: "user" } },
+        { audio: false, video: true },
+        { video: { facingMode: "user" } },
+        { video: true }
+      ];
+      
+      let stream = null;
+      for (let i = 0; i < constraints.length; i++) {
+        try {
+          console.log(`Trying native API with constraint level ${i}:`, constraints[i]);
+          stream = await navigator.mediaDevices.getUserMedia(constraints[i]);
+          console.log(`✓ Native API succeeded at constraint level ${i}`);
+          break;
+        } catch (e) {
+          console.warn(`Native API failed at level ${i}:`, e.message);
+          if (i === constraints.length - 1) throw e;
+        }
+      }
+      
+      if (stream && webcamRef.current?.video) {
+        nativeStreamRef.current = stream;
+        webcamRef.current.video.srcObject = stream;
+        setUseNativeAPI(true);
+        console.log("✓ Camera successfully initialized using native API");
+        return true;
+      }
+    } catch (error) {
+      console.error("Native API initialization failed:", error.name, error.message);
+    }
+    return false;
+  };
+
+  // Cleanup native stream on unmount
+  useEffect(() => {
+    return () => {
+      if (nativeStreamRef.current) {
+        nativeStreamRef.current.getTracks().forEach(track => track.stop());
+        nativeStreamRef.current = null;
+      }
+    };
+  }, []);
+
   return (
     <div className="relative w-full h-screen bg-purple-950 overflow-hidden flex flex-col items-center justify-center font-display">
       {cameraConstraintIndex > 0 && (
@@ -1157,13 +1207,19 @@ export default function GameCanvas() {
             console.error("3. Device camera hardware issue");
             console.error("4. Browser does not support getUserMedia");
             
-            // Show user-friendly error message
-            alert("カメラにアクセスできません。
+            // Try native API as last resort
+            console.log("Attempting native getUserMedia API as final fallback...");
+            initializeNativeCamera().then(success => {
+              if (!success) {
+                // Show user-friendly error message
+                alert("カメラにアクセスできません。
 
 確認事項:
 1. カメラの使用許可を確認してください
 2. 他のアプリでカメラを使用していないか確認してください
 3. ブラウザを再起動してください");
+              }
+            });
           }
         }}
         onUserMedia={() => {
