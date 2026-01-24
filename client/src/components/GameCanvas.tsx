@@ -217,13 +217,18 @@ const MAX_LIVES = 5;
 export default function GameCanvas() {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [cameraConstraintIndex, setCameraConstraintIndex] = useState(0);
+  const cameraConstraintIndexRef = useRef(0);
   
-  // Video constraints optimized for Samsung tablet compatibility
-  const videoConstraints = {
-    width: { ideal: 1280 },
-    height: { ideal: 720 },
-    facingMode: { ideal: "user" }
-  };
+  // Multiple fallback video constraints for Samsung tablet compatibility
+  const videoConstraintsList = [
+    { facingMode: "user" },
+    { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+    { width: { ideal: 1024 }, height: { ideal: 576 }, facingMode: "user" },
+    { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }
+  ];
+  
+  const videoConstraints = videoConstraintsList[cameraConstraintIndex];
   
   // Game State
   const [gameState, setGameState] = useState<GameState>("start");
@@ -372,6 +377,10 @@ export default function GameCanvas() {
 
   const sensitivityRef = useRef(sensitivity);
   useEffect(() => { sensitivityRef.current = sensitivity; }, [sensitivity]);
+  useEffect(() => { cameraConstraintIndexRef.current = cameraConstraintIndex; }, [cameraConstraintIndex]);
+  useEffect(() => {
+    console.log(`Using camera constraint ${cameraConstraintIndex}:`, videoConstraintsList[cameraConstraintIndex]);
+  }, [cameraConstraintIndex]);
   
   const gameStateRef = useRef(gameState);
   useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
@@ -1073,6 +1082,11 @@ export default function GameCanvas() {
 
   return (
     <div className="relative w-full h-screen bg-purple-950 overflow-hidden flex flex-col items-center justify-center font-display">
+      {cameraConstraintIndex > 0 && (
+        <div className="absolute top-2 left-2 z-50 bg-red-900/80 text-white px-3 py-2 rounded text-xs md:text-sm">
+          Camera Fallback: Constraint {cameraConstraintIndex}/{videoConstraintsList.length - 1}
+        </div>
+      )}
       <Webcam
         ref={webcamRef}
         className="absolute opacity-0"
@@ -1081,10 +1095,23 @@ export default function GameCanvas() {
         height={720}
         videoConstraints={videoConstraints}
         onUserMediaError={(error) => {
-          console.error("Camera error:", error);
-          // Fallback: try with less restrictive constraints
-          if (error.name === "NotReadableError" || error.name === "NotAllowedError") {
-            console.warn("Retrying with fallback constraints...");
+          console.error("Camera error with constraint index", cameraConstraintIndexRef.current, ":", error);
+          
+          if (cameraConstraintIndexRef.current < videoConstraintsList.length - 1) {
+            const nextIndex = cameraConstraintIndexRef.current + 1;
+            console.warn(`Retrying with fallback constraint ${nextIndex}...`);
+            cameraConstraintIndexRef.current = nextIndex;
+            setCameraConstraintIndex(nextIndex);
+            
+            setTimeout(() => {
+              if (webcamRef.current?.video) {
+                webcamRef.current.video.play().catch(e => {
+                  console.error("Failed to play video:", e);
+                });
+              }
+            }, 500);
+          } else {
+            console.error("All camera constraints failed. Camera may be in use or not available.");
           }
         }}
       />
