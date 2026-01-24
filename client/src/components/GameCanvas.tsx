@@ -592,6 +592,48 @@ export default function GameCanvas() {
       }
     }
     
+    // Normal Enemy Attack Logic (Level 2+)
+    if (difficultyRef.current >= 2) {
+      const attackInterval = Math.max(60, 180 - (difficultyRef.current * 20)); // Faster attacks at higher levels
+      const bulletsPerAttack = Math.min(difficultyRef.current - 1, 5); // Level 2: 1 bullet, Level 3: 2 bullets, etc.
+      
+      if (frameCountRef.current % attackInterval === 0) {
+        const normalEnemies = entitiesRef.current.filter(e => 
+          e.type === "enemy" && !e.isBoss && !e.isProjectile && (e.life ?? 0) > 0 && e.y > 0 && e.y < height * 0.6
+        );
+        
+        normalEnemies.forEach(enemy => {
+          if (Math.random() < 0.4) { // 40% chance each enemy fires
+            for (let i = 0; i < bulletsPerAttack; i++) {
+              const dx = cursorPosRef.current.x - (enemy.x + enemy.width/2);
+              const dy = cursorPosRef.current.y - (enemy.y + enemy.height/2);
+              const dist = Math.hypot(dx, dy);
+              const speed = 6 + difficultyRef.current; // Faster bullets at higher levels
+              const spread = (i - (bulletsPerAttack - 1) / 2) * 0.3; // Spread bullets
+              
+              const isMobile = width < 600;
+              const bulletSize = isMobile ? 30 : 50;
+              
+              entitiesRef.current.push({
+                id: Math.random(),
+                x: enemy.x + enemy.width/2 - bulletSize/2,
+                y: enemy.y + enemy.height/2,
+                width: bulletSize,
+                height: bulletSize,
+                vx: (dx / dist) * speed + spread * speed,
+                vy: (dy / dist) * speed,
+                type: "enemy",
+                isProjectile: true,
+                image: imagesRef.current.enemyFireball,
+                life: 1,
+                maxLife: 1
+              });
+            }
+          }
+        });
+      }
+    }
+    
     // Check if boss is still active
     if (bossActiveRef.current) {
       const bossExists = entitiesRef.current.some(e => e.isBoss);
@@ -639,12 +681,14 @@ export default function GameCanvas() {
       
       if (e.y > height + 50) {
         if (e.type === "enemy") {
-          takeDamage();
-          
+          // Boss escaping doesn't cause damage, but normal enemies do
           if (e.isBoss) {
             bossActiveRef.current = false;
-            // Allow boss to respawn if it escaped
+            // Allow boss to respawn immediately
             bossSpawnedForLevelRef.current = difficultyRef.current - 1;
+          } else if (!e.isProjectile) {
+            // Only non-projectile enemies cause damage when escaping
+            takeDamage();
           }
         }
         return false;
