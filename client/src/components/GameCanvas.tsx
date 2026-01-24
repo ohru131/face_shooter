@@ -220,11 +220,20 @@ export default function GameCanvas() {
   const [cameraConstraintIndex, setCameraConstraintIndex] = useState(0);
   const cameraConstraintIndexRef = useRef(0);
   
-  // Multiple fallback video constraints for Samsung tablet compatibility
+  // Aggressive fallback strategy for Samsung tablet compatibility
+  // Start with absolutely minimal constraints and progressively add more
   const videoConstraintsList = [
+    // Level 0: No constraints at all - maximum compatibility
     { facingMode: "user" },
+    // Level 1: Only facingMode with audio disabled
+    { facingMode: "user", audio: false },
+    // Level 2: Minimal resolution
+    { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: "user" },
+    // Level 3: Low resolution
     { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+    // Level 4: Medium resolution
     { width: { ideal: 1024 }, height: { ideal: 576 }, facingMode: "user" },
+    // Level 5: Standard resolution
     { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }
   ];
   
@@ -1110,24 +1119,46 @@ export default function GameCanvas() {
         height={720}
         videoConstraints={videoConstraints}
         onUserMediaError={(error) => {
-          console.error("Camera error with constraint index", cameraConstraintIndexRef.current, ":", error);
+          const currentIndex = cameraConstraintIndexRef.current;
+          console.error(`Camera error at constraint level ${currentIndex}:`, error.name, error.message);
+          console.warn(`Current constraint: ${JSON.stringify(videoConstraintsList[currentIndex])}`);
           
-          if (cameraConstraintIndexRef.current < videoConstraintsList.length - 1) {
-            const nextIndex = cameraConstraintIndexRef.current + 1;
-            console.warn(`Retrying with fallback constraint ${nextIndex}...`);
+          // Try next fallback level
+          if (currentIndex < videoConstraintsList.length - 1) {
+            const nextIndex = currentIndex + 1;
+            console.warn(`Attempting fallback constraint level ${nextIndex}/${videoConstraintsList.length - 1}...`);
             cameraConstraintIndexRef.current = nextIndex;
             setCameraConstraintIndex(nextIndex);
             
+            // Retry with increased delay for Samsung devices
             setTimeout(() => {
+              console.log(`Retrying camera access with constraint level ${nextIndex}`);
               if (webcamRef.current?.video) {
                 webcamRef.current.video.play().catch(e => {
-                  console.error("Failed to play video:", e);
+                  console.error(`Failed to play video at level ${nextIndex}:`, e);
                 });
               }
-            }, 500);
+            }, 1000);  // Increased from 500ms to 1000ms
           } else {
-            console.error("All camera constraints failed. Camera may be in use or not available.");
+            console.error(`All ${videoConstraintsList.length} camera constraint levels failed!`);
+            console.error("Possible causes:");
+            console.error("1. Camera permission not granted");
+            console.error("2. Camera is already in use by another app");
+            console.error("3. Device camera hardware issue");
+            console.error("4. Browser does not support getUserMedia");
+            
+            // Show user-friendly error message
+            alert("カメラにアクセスできません。
+
+確認事項:
+1. カメラの使用許可を確認してください
+2. 他のアプリでカメラを使用していないか確認してください
+3. ブラウザを再起動してください");
           }
+        }}
+        onUserMedia={() => {
+          console.log(`✓ Camera successfully initialized at constraint level ${cameraConstraintIndexRef.current}`);
+          console.log(`Using constraint: ${JSON.stringify(videoConstraintsList[cameraConstraintIndexRef.current])}`);
         }}
       />
       <canvas
