@@ -781,6 +781,10 @@ export default function GameCanvas() {
       if (e.type !== "enemy") return;
       if ((e.life ?? 0) <= 0) return;
       if (e.y > height) return;
+      
+      // Only check collision after enemy passes status area (y > 100)
+      const statusAreaHeight = 100;
+      if (e.y < statusAreaHeight) return;
 
       if (
         playerHitbox.x < e.x + e.width &&
@@ -896,7 +900,18 @@ export default function GameCanvas() {
       const visualX = (1 - newX) * width;
       const visualY = newY * height;
       
-      cursorPosRef.current = { x: visualX, y: visualY };
+      // Limit player movement to keep at least half visible
+      const isMobile = width < 600;
+      const playerSize = isMobile ? 120 : 250;
+      const minX = playerSize / 4;  // Keep at least 1/4 from left edge
+      const maxX = width - playerSize / 4;  // Keep at least 1/4 from right edge
+      const minY = playerSize / 4;  // Keep at least 1/4 from top edge
+      const maxY = height - playerSize / 4;  // Keep at least 1/4 from bottom edge
+      
+      const constrainedX = Math.max(minX, Math.min(maxX, visualX));
+      const constrainedY = Math.max(minY, Math.min(maxY, visualY));
+      
+      cursorPosRef.current = { x: constrainedX, y: constrainedY };
 
       // Mouth Logic
       const upperLip = landmarks[13];
@@ -1130,23 +1145,23 @@ export default function GameCanvas() {
           <h1 className="text-xl md:text-4xl text-purple-400 drop-shadow-sm tracking-wider hidden md:block" style={{ textShadow: '2px 2px 0px #1a0a2e, 0 0 10px #9333ea' }}>Witch Shooter</h1>
           
           {/* Score & Lives Container */}
-          <div className="flex items-center gap-2 md:gap-4 bg-purple-900/80 backdrop-blur-sm p-2 rounded-xl border-2 border-purple-500 shadow-lg">
+          <div className="flex items-center gap-2 md:gap-4 bg-purple-900/80 backdrop-blur-sm p-2 rounded-xl border-2 border-purple-500 shadow-lg h-fit">
              {/* Score */}
              <div className="flex flex-col md:flex-row items-center gap-1 md:gap-2">
-               <span className="text-xs md:text-lg text-orange-400 font-bold">SCORE</span>
-               <span className="text-lg md:text-3xl text-orange-300 font-pixel tracking-widest">{score.toString().padStart(6, '0')}</span>
+               <span className="text-xs md:text-lg text-orange-400 font-bold h-5 md:h-6 flex items-center">SCORE</span>
+               <span className="text-lg md:text-3xl text-orange-300 font-pixel tracking-widest h-5 md:h-8 flex items-center">{score.toString().padStart(6, '0')}</span>
              </div>
              
              {/* Divider */}
              <div className="w-px h-8 bg-purple-500 mx-1"></div>
 
              {/* Lives */}
-             <div className="flex items-center gap-1">
+             <div className="flex items-center gap-1 h-8 md:h-8">
                {Array.from({ length: MAX_LIVES }).map((_, i) => (
                  <img 
                    key={i} 
                    src={ASSETS.heart} 
-                   className={`w-5 h-5 md:w-8 md:h-8 transition-all ${i < lives ? 'opacity-100 scale-100' : 'opacity-20 scale-75 grayscale'}`} 
+                   className={`w-5 h-5 md:w-8 md:h-8 transition-all flex-shrink-0 ${i < lives ? 'opacity-100 scale-100' : 'opacity-20 scale-75 grayscale'}`} 
                    alt="heart"
                  />
                ))}
