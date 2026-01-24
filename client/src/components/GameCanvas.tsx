@@ -1212,12 +1212,7 @@ export default function GameCanvas() {
             initializeNativeCamera().then(success => {
               if (!success) {
                 // Show user-friendly error message
-                alert("カメラにアクセスできません。
-
-確認事項:
-1. カメラの使用許可を確認してください
-2. 他のアプリでカメラを使用していないか確認してください
-3. ブラウザを再起動してください");
+                alert("カメラにアクセスできません。\n\n確認事項:\n1. カメラの使用許可を確認してください\n2. 他のアプリでカメラを使用していないか確認してください\n3. ブラウザを再起動してください");
               }
             });
           }
