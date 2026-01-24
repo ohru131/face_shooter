@@ -246,11 +246,21 @@ export default function GameCanvas() {
   useEffect(() => { isFaceMissingRef.current = isFaceMissing; }, [isFaceMissing]);
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(MAX_LIVES);
-  const [sensitivity, setSensitivity] = useState(1.5);
+  // Initialize sensitivity from localStorage or use default
+  const [sensitivity, setSensitivity] = useState(() => {
+    const saved = localStorage.getItem('witch_shooter_sensitivity');
+    return saved ? parseFloat(saved) : 1.5;
+  });
   const [isMouthOpen, setIsMouthOpen] = useState(false);
   const isMouthOpenRef = useRef(false);
   const wasMouthOpenRef = useRef(false);
   useEffect(() => { isMouthOpenRef.current = isMouthOpen; }, [isMouthOpen]);
+  
+  // Save sensitivity to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('witch_shooter_sensitivity', sensitivity.toString());
+  }, [sensitivity]);
+  
   const [difficulty, setDifficulty] = useState(1);
   const difficultyRef = useRef(1);
   const [showLevelUp, setShowLevelUp] = useState(false);
