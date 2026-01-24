@@ -218,6 +218,13 @@ export default function GameCanvas() {
   const webcamRef = useRef<Webcam>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
+  // Video constraints optimized for Samsung tablet compatibility
+  const videoConstraints = {
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    facingMode: { ideal: "user" }
+  };
+  
   // Game State
   const [gameState, setGameState] = useState<GameState>("start");
   const [isFaceMissing, setIsFaceMissing] = useState(false);
@@ -1072,6 +1079,14 @@ export default function GameCanvas() {
         mirrored={true}
         width={1280}
         height={720}
+        videoConstraints={videoConstraints}
+        onUserMediaError={(error) => {
+          console.error("Camera error:", error);
+          // Fallback: try with less restrictive constraints
+          if (error.name === "NotReadableError" || error.name === "NotAllowedError") {
+            console.warn("Retrying with fallback constraints...");
+          }
+        }}
       />
       <canvas
         ref={canvasRef}
